@@ -180,9 +180,11 @@ return [
 ];
 ```
 
-The local `sandbox_clone_pull_request` tool runs clone and fetch before
-returning control to the model. Nothing is written to disk, and subsequent
-model-driven shell commands do not contain the key.
+The local `sandbox_clone_pull_request` tool performs a depth-one clone of the
+PR's explicit base branch and fetches the pull ref before returning control to
+the model. It avoids partial-clone promisor state, which is fragile across HTTP
+proxies. Nothing is written to Git configuration, and subsequent model-driven
+shell commands do not contain the key.
 
 Filesystem tools accept only normalized paths under `/workspace`; values such
 as `/workspace/../etc` are rejected before they reach Modal. Repository files,

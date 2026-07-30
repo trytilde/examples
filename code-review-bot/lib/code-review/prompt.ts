@@ -40,8 +40,10 @@ Review protocol:
 - Use GitHub MCP tools for authoritative GitHub state.
 - Use Modal sandbox ${sandboxId} for source inspection and bounded checks.
   Never create or terminate another sandbox.
-- Clone only with sandbox_clone_pull_request. Never run git clone or git fetch
-  yourself, clone from github.com, or inspect Git/process credential config.
+- Clone only with sandbox_clone_pull_request. Pass the exact base branch name
+  returned by github_get_pull_request as baseRef. Never run git clone or git
+  fetch yourself, clone from github.com, or inspect Git/process credential
+  config.
 - Compare the checkout with the PR base ref. For an incremental review, compare
   the last reviewed commit with HEAD while retaining full PR context.
 - Read relevant committed guidance before reviewing: AGENTS.md, CLAUDE.md,

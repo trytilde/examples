@@ -11,6 +11,7 @@ import {
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Env } from "@/lib/env";
+import { isSafeGitBranch } from "./git-ref";
 import { gitProxyCommand, type GitProxyConfig } from "./git-proxy";
 import { isWorkspacePath } from "./workspace-path";
 
@@ -149,17 +150,22 @@ function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {
       description:
         "Clone a GitHub pull request through Tilde. Authentication is scoped to the clone/fetch processes and is never persisted.",
       inputSchema: z.object({
+        baseRef: z
+          .string()
+          .refine(isSafeGitBranch, "baseRef must be a valid Git branch"),
         owner: z.string().regex(GITHUB_NAME),
         pullNumber: z.number().int().positive(),
         repo: z.string().regex(GITHUB_NAME),
       }),
-      execute: async ({ owner, pullNumber, repo }) => {
+      execute: async ({ baseRef, owner, pullNumber, repo }) => {
         const workdir = `/workspace/${repo}`;
         await requireSuccessfulCommand(
           sandbox,
           gitProxyCommand(gitProxy, [
             "clone",
-            "--filter=blob:none",
+            "--depth=1",
+            "--branch",
+            baseRef,
             "--no-checkout",
             `${gitProxy.proxyUrl}/${owner}/${repo}.git`,
             workdir,
@@ -171,6 +177,7 @@ function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {
             "-C",
             workdir,
             "fetch",
+            "--depth=1",
             "origin",
             `+refs/pull/${pullNumber}/head:refs/remotes/origin/pull/${pullNumber}/head`,
           ]),
@@ -189,7 +196,7 @@ function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {
         if (head.exitCode !== 0) {
           throw new Error(`Unable to resolve pull request HEAD: ${head.stderr}`);
         }
-        return { headSha: head.stdout.trim(), workdir };
+        return { baseRef, headSha: head.stdout.trim(), workdir };
       },
     }),
     sandbox_exec: tool({
