@@ -59,6 +59,46 @@ App IDs, private keys, installation IDs, and Modal keys are generated or
 entered during a human setup handoff. The resulting reverse-proxy IDs become
 deployment configuration.
 
+## Create one Harness client
+
+The application creates one Tilde client and reuses it for ChatKit, MCP, and
+reverse-proxy routing:
+
+```ts
+import { createClient } from "@tilde/harness-sdk";
+
+export const tilde = createClient({
+  apiKey: env.TILDE_API_KEY,
+  baseUrl: env.TILDE_BASE_URL,
+  orgId: env.TILDE_ORG_ID,
+  orgSubdomain: false,
+  teamId: env.TILDE_TEAM_ID,
+});
+```
+
+That client is constructed outside the route handler and passed directly to
+`chatKitEndpoint`. The endpoint verifies Tilde's webhook signature, validates
+the ChatKit request body, resolves typed provider metadata, and exposes
+session history:
+
+```ts
+export const POST = chatKitEndpoint({
+  client: tilde,
+  webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
+  async handler(request, context) {
+    const history = await context.session.history();
+    const messages = await convertToAiSdkMessages({
+      messages: [...history.items, ...context.messages],
+      chatkit: context.chatkit,
+    });
+    // Run the review.
+  },
+});
+```
+
+Application code does not reimplement webhook parsing, ChatKit schemas,
+history pagination, MCP transport, or provider metadata.
+
 ## Turn GitHub into a ChatKit message
 
 When someone tags the installed app, Tilde supplies the PR coordinates as
@@ -93,11 +133,17 @@ The route connects to the Tilde MCP server and combines its remote GitHub tools
 with local sandbox tools:
 
 ```ts
+const { mcp, closeMcp } = await createMCPClient({
+  client: tilde,
+  serverId: env.TILDE_MCP_SERVER_ID,
+});
 const remoteTools = await mcp.tools();
-const sandbox = await createCodeReviewSandbox(env, tilde, request.signal);
+const sandbox = await createCodeReviewSandbox(env, tilde, signal);
 
 const tools = {
-  ...remoteTools,
+  ...Object.fromEntries(
+    Object.entries(remoteTools).filter(([name]) => !name.startsWith("modal_")),
+  ),
   ...sandbox.tools,
 };
 ```
@@ -106,10 +152,11 @@ The application uses Modal's JavaScript SDK through Tilde's generic gRPC
 reverse proxy. Tilde selects the team and proxy profile using gRPC metadata,
 then injects the real Modal credentials upstream.
 
-The sandbox has two CPUs, 2 GiB of memory, a 30-minute hard limit, and a
-five-minute idle timeout. Its image contains Git, GitHub CLI, ripgrep, jq, and
-pnpm. Building those tools into the image avoids an `apt-get` delay on every
-review.
+The sandbox has hard limits of two CPUs and 2 GiB of memory, a 30-minute
+maximum lifetime, and a five-minute idle timeout. Outbound traffic is limited
+to the configured Tilde reverse-proxy host. Its image contains Git, GitHub CLI,
+ripgrep, jq, and pnpm. Modal caches the image layers, so tools do not need to
+be installed interactively for every review.
 
 ## Clone without leaving a credential behind
 
@@ -136,6 +183,11 @@ return [
 The local `sandbox_clone_pull_request` tool runs clone and fetch before
 returning control to the model. Nothing is written to disk, and subsequent
 model-driven shell commands do not contain the key.
+
+Filesystem tools accept only normalized paths under `/workspace`; values such
+as `/workspace/../etc` are rejected before they reach Modal. Repository files,
+PR text, comments, command output, and tool results are treated as untrusted
+evidence, not instructions that can change the target or tool policy.
 
 ## Review more than the patch
 
@@ -214,7 +266,9 @@ policy systems still decide whether a PR is approved.
 
 The Next.js route streams with Vercel AI SDK and sets a five-minute maximum
 duration. The same endpoint accepts direct ChatKit invocations and GitHub
-messages.
+messages. An internal 285-second abort budget leaves time for cleanup before
+the hosting platform's hard limit. Error, abort, and finish callbacks await the
+same idempotent cleanup promise for the Modal sandbox and MCP client.
 
 Deployment is:
 
