@@ -1,4 +1,9 @@
 import {
+  createTildeGrpcReverseProxy,
+  reverseProxyPath,
+  type Client,
+} from "@tilde/harness-sdk";
+import {
   ModalClient,
   type Sandbox,
   type SandboxExecParams,
@@ -6,9 +11,6 @@ import {
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Env } from "@/lib/env";
-import { createTildeGrpcReverseProxy } from "@/lib/tilde/grpc-reverse-proxy";
-import { reverseProxyUrl } from "@/lib/tilde/paths";
-import type { TildeConfig } from "@/lib/tilde/types";
 import { gitProxyCommand, type GitProxyConfig } from "./git-proxy";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -31,13 +33,13 @@ export type CodeReviewSandbox = {
 
 export async function createCodeReviewSandbox(
   env: Env,
-  config: TildeConfig,
+  client: Client,
   abortSignal: AbortSignal,
 ): Promise<CodeReviewSandbox> {
-  const modalProxy = createTildeGrpcReverseProxy(
-    config,
-    env.TILDE_MODAL_PROXY_PROFILE_ID,
-  );
+  const modalProxy = createTildeGrpcReverseProxy({
+    client,
+    profileId: env.TILDE_MODAL_PROXY_PROFILE_ID,
+  });
   // Modal 0.9 exposes endpoint but still reads the control-plane target from
   // MODAL_SERVER_URL.
   process.env.MODAL_SERVER_URL = modalProxy.endpoint;
@@ -81,12 +83,17 @@ export async function createCodeReviewSandbox(
   }
 
   const gitProxy: GitProxyConfig = {
-    apiKey: config.apiKey,
-    orgId: config.orgId,
-    proxyUrl: reverseProxyUrl(
-      config,
-      env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
-    ).replace(/\/$/, ""),
+    apiKey: env.TILDE_API_KEY,
+    orgId: env.TILDE_ORG_ID,
+    proxyUrl: new URL(
+      reverseProxyPath({
+        profileId: env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
+        teamId: client.config.teamId,
+      }),
+      client.config.baseUrl,
+    )
+      .toString()
+      .replace(/\/$/, ""),
   };
   let closed = false;
   return {

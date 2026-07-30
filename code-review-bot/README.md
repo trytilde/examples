@@ -205,7 +205,8 @@ found.
   output contract.
 - [`lib/code-review/sandbox.ts`](./lib/code-review/sandbox.ts): Modal lifecycle
   and local tools.
-- [`lib/tilde`](./lib/tilde): the small public adapter used by this example.
+- [Tilde Harness SDK](https://github.com/trytilde/harness-sdk): ChatKit, MCP,
+  reverse-proxy, and typed provider-context integration.
 - [`tilde-state.yaml`](./tilde-state.yaml): portable Tilde resources.
 - [`post.md`](./post.md): draft article explaining the design.
 

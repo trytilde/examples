@@ -17,8 +17,8 @@
     ]
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -33,6 +33,7 @@
     "nice-grpc": "2.1.16",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "tilde-harness-sdk": "git+https://github.com/trytilde/harness-sdk.git#a1868803df1ea4283e74f88424024635d5a58d88",
     "zod": "4.4.3"
   },
   "devDependencies": {

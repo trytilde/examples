@@ -1,3 +1,9 @@
+import { createClient } from "@tilde/harness-sdk";
+import {
+  chatKitEndpoint,
+  convertToAiSdkMessages,
+  createMCPClient,
+} from "@tilde/harness-sdk-vercel-ai-node";
 import { openai } from "@ai-sdk/openai";
 import {
   consumeStream,
@@ -11,36 +17,38 @@ import {
   type CodeReviewSandbox,
 } from "@/lib/code-review/sandbox";
 import { env } from "@/lib/env";
-import { chatKitEndpoint } from "@/lib/tilde/chatkit";
-import { createTildeMcpClient } from "@/lib/tilde/mcp";
-import type { TildeConfig } from "@/lib/tilde/types";
 
 export const maxDuration = 300;
 
-const tilde: TildeConfig = {
+const client = createClient({
   apiKey: env.TILDE_API_KEY,
   baseUrl: env.TILDE_BASE_URL,
   orgId: env.TILDE_ORG_ID,
+  orgSubdomain: false,
   teamId: env.TILDE_TEAM_ID,
-};
+});
 
 export const POST = chatKitEndpoint({
-  config: tilde,
+  client,
   webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
   async handler(request, context) {
     const startedAt = Date.now();
-    const messages = [...(await context.history()), ...context.messages];
-    const { mcp, closeMcp } = await createTildeMcpClient(
-      tilde,
-      env.TILDE_MCP_SERVER_ID,
-    );
+    const history = await context.session.history();
+    const messages = await convertToAiSdkMessages({
+      messages: [...history.items, ...context.messages],
+      chatkit: context.chatkit,
+    });
+    const { mcp, closeMcp } = await createMCPClient({
+      client,
+      serverId: env.TILDE_MCP_SERVER_ID,
+    });
     let sandbox: CodeReviewSandbox | undefined;
 
     try {
       const remoteTools = await mcp.tools();
       const activeSandbox = await createCodeReviewSandbox(
         env,
-        tilde,
+        client,
         request.signal,
       );
       sandbox = activeSandbox;

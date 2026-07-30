@@ -36,6 +36,9 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      tilde-harness-sdk:
+        specifier: git+https://github.com/trytilde/harness-sdk.git#a1868803df1ea4283e74f88424024635d5a58d88
+        version: git+https://git@github.com:trytilde/harness-sdk.git#a1868803df1ea4283e74f88424024635d5a58d88
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -2356,6 +2359,11 @@ packages:
   supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
+
+  tilde-harness-sdk@git+https://git@github.com:trytilde/harness-sdk.git#a1868803df1ea4283e74f88424024635d5a58d88:
+    resolution: {commit: a1868803df1ea4283e74f88424024635d5a58d88, repo: git@github.com:trytilde/harness-sdk.git, type: git}
+    version: 0.0.0
+    engines: {node: '>=20'}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -4956,6 +4964,8 @@ snapshots:
       has-flag: 4.0.0
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  tilde-harness-sdk@git+https://git@github.com:trytilde/harness-sdk.git#a1868803df1ea4283e74f88424024635d5a58d88: {}
 
   tinybench@2.9.0: {}
 

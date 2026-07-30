@@ -1,8 +1,8 @@
-import type { GitHubChatKitMetadata } from "@/lib/tilde/chatkit";
+import type { GitHubChatKitMessageMetadata } from "@tilde/harness-sdk-vercel-ai-node";
 
 export function codeReviewPrompt(
   sandboxId: string,
-  github?: GitHubChatKitMetadata,
+  github?: GitHubChatKitMessageMetadata,
 ): string {
   const target = github
     ? `

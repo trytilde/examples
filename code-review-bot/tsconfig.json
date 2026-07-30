@@ -25,6 +25,18 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@tilde/api-client": [
+        "./node_modules/tilde-harness-sdk/packages/api-client/src/index.ts"
+      ],
+      "@tilde/harness-sdk": [
+        "./node_modules/tilde-harness-sdk/packages/core/src/index.ts"
+      ],
+      "@tilde/harness-sdk/api": [
+        "./node_modules/tilde-harness-sdk/packages/core/src/api.ts"
+      ],
+      "@tilde/harness-sdk-vercel-ai-node": [
+        "./node_modules/tilde-harness-sdk/packages/vercel-ai-node/src/index.ts"
       ]
     }
   },
