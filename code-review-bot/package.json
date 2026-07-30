@@ -1,0 +1,43 @@
+{
+  "name": "tilde-code-review-bot-example",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "cbor-extract",
+      "esbuild",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "1.0.59",
+    "@ai-sdk/openai": "3.0.81",
+    "ai": "6.0.220",
+    "modal": "0.9.0",
+    "next": "16.2.10",
+    "nice-grpc": "2.1.16",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.1",
+    "eslint-config-next": "16.2.10",
+    "typescript": "5.9.3",
+    "vitest": "4.0.8"
+  }
+}

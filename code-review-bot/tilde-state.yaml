@@ -1,0 +1,149 @@
+metadata:
+  name: code-review-bot
+  description: GitHub pull request reviewer with Tilde MCP and a Modal sandbox.
+resources:
+  chatkit/agent/code-review:
+    configuration:
+      local_running_endpoint: false
+      local_runtime_path: /api/code-review
+      provider: chatkit.http-vercel-ai-sdk
+      streaming: true
+      timeout_ms: 300000
+    displayName: Code Review
+    enabled: true
+    endpointUrl: https://YOUR_DEPLOYMENT.example/api/code-review
+  chatkit/provider/code-review:
+    refs:
+      default_agent: chatkit/agent/code-review
+    defaultAgentInboxId: code-review
+    desiredEnabled: true
+    displayName: Code Review
+    providerConfiguration: {}
+    providerId: chatkit.channel.vercel-ui
+  credential/setup_item/github:
+    credentialSourceTypeId: server_token_exchange
+    desiredEnabled: true
+    displayName: GitHub
+    metadata:
+      bindings:
+        - desiredEnabled: true
+          ownerId: github
+          ownerType: tool_group_instance
+      provider_display_name: GitHub
+      provider_icon_key: github
+      source: state_import
+    ownerId: github
+    ownerType: state_import_credential
+    providerId: github
+    status: pending
+  mcp/tool_provider/github:
+    refs:
+      resource_server_credential: credential/setup_item/github
+    credentialSourceTypeId: server_token_exchange
+    displayName: GitHub
+    resourceServerCredentialId: null
+    status: brokering_initiated
+    toolGroupSourceTypeId: github
+    userCredentialId: null
+  credential/setup_item/modal-sandbox:
+    credentialSourceTypeId: modal_custom_json_schema
+    desiredEnabled: true
+    displayName: Modal
+    metadata:
+      bindings:
+        - desiredEnabled: true
+          ownerId: modal-sandbox
+          ownerType: tool_group_instance
+      provider_display_name: Modal
+      provider_icon_key: modal_sandbox
+      source: state_import
+    ownerId: modal-sandbox
+    ownerType: state_import_credential
+    providerId: modal_sandbox
+    status: pending
+  mcp/tool_provider/modal-sandbox:
+    refs:
+      resource_server_credential: credential/setup_item/modal-sandbox
+    credentialSourceTypeId: modal_custom_json_schema
+    displayName: Modal
+    resourceServerCredentialId: null
+    status: brokering_initiated
+    toolGroupSourceTypeId: modal_sandbox
+    userCredentialId: null
+  mcp/server/code-review:
+    refs:
+      tool_provider_github: mcp/tool_provider/github
+      tool_provider_modal_sandbox: mcp/tool_provider/modal-sandbox
+    displayName: Code Review
+    isDynamicToolDiscovery: false
+    functions:
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Read pull request metadata and the current head commit.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_get_pull_request
+        toolSourceTypeId: github_get_pull_request
+      - configuredParams: {}
+        enabled: true
+        toolDescription: List changed files and patches.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_list_pull_request_files
+        toolSourceTypeId: github_list_pull_request_files
+      - configuredParams: {}
+        enabled: true
+        toolDescription: List pull request commits.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_list_pull_request_commits
+        toolSourceTypeId: github_list_pull_request_commits
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Read pull request conversation comments.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_list_issue_comments
+        toolSourceTypeId: github_list_issue_comments
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Read existing pull request reviews.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_list_pull_request_reviews
+        toolSourceTypeId: github_list_pull_request_reviews
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Read existing inline review comments.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_list_pull_request_review_comments
+        toolSourceTypeId: github_list_pull_request_review_comments
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Post one finding on a changed line.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_create_pull_request_review_comment
+        toolSourceTypeId: github_create_pull_request_review_comment
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Reply in an inline review thread.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_reply_to_pull_request_review_comment
+        toolSourceTypeId: github_reply_to_pull_request_review_comment
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Create a review summary using COMMENT.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_create_pull_request_review
+        toolSourceTypeId: github_create_pull_request_review
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Submit a pending review using COMMENT.
+        toolGroupInstanceId: github
+        toolGroupSourceTypeId: github
+        toolName: github_submit_pull_request_review
+        toolSourceTypeId: github_submit_pull_request_review
