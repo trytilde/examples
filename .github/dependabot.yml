@@ -4,4 +4,15 @@ updates:
     directory: /code-review-bot
     schedule:
       interval: weekly
+    groups:
+      compatible-updates:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
