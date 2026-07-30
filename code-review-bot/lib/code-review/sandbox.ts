@@ -12,6 +12,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Env } from "@/lib/env";
 import { gitProxyCommand, type GitProxyConfig } from "./git-proxy";
+import { isWorkspacePath } from "./workspace-path";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -20,10 +21,7 @@ const MAX_OUTPUT_CHARS = 40_000;
 const GITHUB_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
 const workspacePath = z
   .string()
-  .refine(
-    (value) => value === "/workspace" || value.startsWith("/workspace/"),
-    "Path must be /workspace or one of its descendants",
-  );
+  .refine(isWorkspacePath, "Path must be a normalized /workspace path");
 
 export type CodeReviewSandbox = {
   close(): Promise<void>;
@@ -36,47 +34,56 @@ export async function createCodeReviewSandbox(
   client: Client,
   abortSignal: AbortSignal,
 ): Promise<CodeReviewSandbox> {
+  abortSignal.throwIfAborted();
   const modalProxy = createTildeGrpcReverseProxy({
     client,
     profileId: env.TILDE_MODAL_PROXY_PROFILE_ID,
   });
-  // Modal 0.9 exposes endpoint but still reads the control-plane target from
-  // MODAL_SERVER_URL.
-  process.env.MODAL_SERVER_URL = modalProxy.endpoint;
-  const modal = new ModalClient({
-    endpoint: modalProxy.endpoint,
-    grpcMiddleware: [modalProxy.middleware],
-    tokenId: "tilde-reverse-proxy",
-    tokenSecret: "tilde-reverse-proxy",
-  });
-  const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, {
-    createIfMissing: true,
-  });
-  const image = modal.images
-    .fromRegistry("node:22-bookworm")
-    .dockerfileCommands([
-      "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git gh jq ripgrep && rm -rf /var/lib/apt/lists/*",
-      "RUN npm install --global pnpm@10",
-    ]);
-  const sandbox = await modal.sandboxes.create(app, image, {
-    cpu: 2,
-    idleTimeoutMs: FIVE_MINUTES_MS,
-    memoryMiB: 2048,
-    tags: { agent: "code-review" },
-    timeoutMs: THIRTY_MINUTES_MS,
-  });
-  abortSignal.addEventListener(
-    "abort",
-    () => {
-      void sandbox.terminate().catch(() => undefined);
-      modal.close();
-    },
-    { once: true },
-  );
+  const modal = createModalClient(modalProxy);
+  let sandbox: Sandbox | undefined;
+  try {
+    abortSignal.throwIfAborted();
+    const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, {
+      createIfMissing: true,
+    });
+    abortSignal.throwIfAborted();
+    const image = modal.images
+      .fromRegistry("node:22-bookworm")
+      .dockerfileCommands([
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git gh jq ripgrep && rm -rf /var/lib/apt/lists/*",
+        "RUN npm install --global pnpm@10",
+      ]);
+    sandbox = await modal.sandboxes.create(app, image, {
+      cpu: 2,
+      cpuLimit: 2,
+      idleTimeoutMs: FIVE_MINUTES_MS,
+      memoryMiB: 2048,
+      memoryLimitMiB: 2048,
+      outboundDomainAllowlist: [new URL(client.config.baseUrl).hostname],
+      tags: { agent: "code-review" },
+      timeoutMs: THIRTY_MINUTES_MS,
+    });
+  } catch (error) {
+    await sandbox?.terminate().catch(() => undefined);
+    modal.close();
+    throw error;
+  }
+  const abort = () => {
+    void sandbox
+      .terminate()
+      .catch(() => undefined)
+      .finally(() => modal.close());
+  };
+  abortSignal.addEventListener("abort", abort, { once: true });
+  if (abortSignal.aborted) {
+    abort();
+    abortSignal.throwIfAborted();
+  }
 
   try {
     await requireSuccessfulCommand(sandbox, ["mkdir", "-p", "/workspace"]);
   } catch (error) {
+    abortSignal.removeEventListener("abort", abort);
     await sandbox.terminate().catch(() => undefined);
     modal.close();
     throw error;
@@ -102,6 +109,7 @@ export async function createCodeReviewSandbox(
     async close() {
       if (closed) return;
       closed = true;
+      abortSignal.removeEventListener("abort", abort);
       await sandbox.terminate().catch((error) => {
         console.error("sandbox_termination_failed", {
           error,
@@ -111,6 +119,28 @@ export async function createCodeReviewSandbox(
       modal.close();
     },
   };
+}
+
+function createModalClient(
+  proxy: ReturnType<typeof createTildeGrpcReverseProxy>,
+): ModalClient {
+  // Modal 0.9 declares `endpoint` but reads MODAL_SERVER_URL synchronously.
+  const previousServerUrl = process.env.MODAL_SERVER_URL;
+  process.env.MODAL_SERVER_URL = proxy.endpoint;
+  try {
+    return new ModalClient({
+      endpoint: proxy.endpoint,
+      grpcMiddleware: [proxy.middleware],
+      tokenId: "tilde-reverse-proxy",
+      tokenSecret: "tilde-reverse-proxy",
+    });
+  } finally {
+    if (previousServerUrl === undefined) {
+      delete process.env.MODAL_SERVER_URL;
+    } else {
+      process.env.MODAL_SERVER_URL = previousServerUrl;
+    }
+  }
 }
 
 function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {

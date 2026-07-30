@@ -191,7 +191,10 @@ found.
 - Keep Git clone authentication process-scoped and out of `.gitconfig`.
 - Use webhook signature verification and reject stale requests.
 - Keep sandbox CPU, memory, execution time, output, and idle lifetime bounded.
+- Restrict sandbox egress to the configured Tilde reverse-proxy host.
 - Do not inject platform credentials into the sandbox.
+- Keep request timeout below the hosting platform's hard function limit and
+  await idempotent MCP and sandbox cleanup.
 - Re-read GitHub state after every write.
 - Monitor tool errors, model finish reasons, review duration, and sandbox
   termination failures.
@@ -205,6 +208,7 @@ found.
   output contract.
 - [`lib/code-review/sandbox.ts`](./lib/code-review/sandbox.ts): Modal lifecycle
   and local tools.
+- [`lib/tilde.ts`](./lib/tilde.ts): the single configured Harness SDK client.
 - [Tilde Harness SDK](https://github.com/trytilde/harness-sdk): ChatKit, MCP,
   reverse-proxy, and typed provider-context integration.
 - [`tilde-state.yaml`](./tilde-state.yaml): portable Tilde resources.

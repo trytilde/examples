@@ -4,7 +4,7 @@ const required = z.string().trim().min(1);
 
 const envSchema = z.object({
   OPENAI_API_KEY: required,
-  OPENAI_MODEL: required.default("gpt-5.1"),
+  OPENAI_MODEL: required.default("gpt-5.4"),
   TILDE_API_KEY: required,
   TILDE_BASE_URL: z.string().url().default("https://api.trytilde.ai"),
   TILDE_GITHUB_GIT_PROXY_PROFILE_ID: required,
