@@ -4,6 +4,10 @@
   "private": true,
   "packageManager": "pnpm@10.33.1",
   "pnpm": {
+    "overrides": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    },
     "onlyBuiltDependencies": [
       "cbor-extract",
       "esbuild",
@@ -25,10 +29,10 @@
     "@ai-sdk/openai": "3.0.81",
     "ai": "6.0.220",
     "modal": "0.9.0",
-    "next": "16.2.10",
+    "next": "16.2.12",
     "nice-grpc": "2.1.16",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "zod": "4.4.3"
   },
   "devDependencies": {
@@ -36,7 +40,7 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.1",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.12",
     "typescript": "5.9.3",
     "vitest": "4.0.8"
   }
