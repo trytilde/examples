@@ -46,6 +46,21 @@ export async function createCodeReviewSandbox(
   });
   const modal = createModalClient(modalProxy);
   let sandbox: Sandbox | undefined;
+  let closed = false;
+
+  async function close() {
+    if (closed) return;
+    closed = true;
+    const activeSandbox = sandbox;
+    await activeSandbox?.terminate().catch((error) => {
+      console.error(
+        `Could not stop Modal sandbox ${activeSandbox.sandboxId}.`,
+        error,
+      );
+    });
+    modal.close();
+  }
+
   try {
     const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, {
       createIfMissing: true,
@@ -67,8 +82,7 @@ export async function createCodeReviewSandbox(
       timeoutMs: THIRTY_MINUTES_MS,
     });
   } catch (error) {
-    await sandbox?.terminate().catch(() => undefined);
-    modal.close();
+    await close();
     throw error;
   }
 
@@ -100,25 +114,13 @@ export async function createCodeReviewSandbox(
       `git -C ${workdir} checkout --detach refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
     );
   } catch (error) {
-    await sandbox.terminate().catch(() => undefined);
-    modal.close();
+    await close();
     throw error;
   }
 
-  let closed = false;
   return {
+    close,
     id: sandbox.sandboxId,
-    async close() {
-      if (closed) return;
-      closed = true;
-      await sandbox.terminate().catch((error) => {
-        console.error(
-          `Could not stop Modal sandbox ${sandbox.sandboxId}.`,
-          error,
-        );
-      });
-      modal.close();
-    },
   };
 }
 
