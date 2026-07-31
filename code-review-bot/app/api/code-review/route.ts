@@ -25,6 +25,13 @@ export const POST = chatKitEndpoint({
   client: tilde,
   webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
   async handler(request, context) {
+    if (
+      !context.github?.owner ||
+      !context.github.repo ||
+      !context.github.pull_number
+    ) {
+      throw new Error("A GitHub pull request is required for a code review.");
+    }
     const signal = AbortSignal.any([
       request.signal,
       AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -56,27 +63,23 @@ export const POST = chatKitEndpoint({
     try {
       const remoteTools = await mcp.tools();
       console.info(`Loaded ${Object.keys(remoteTools).length} MCP tools.`);
-      const activeSandbox = await createCodeReviewSandbox(env, tilde);
+      const activeSandbox = await createCodeReviewSandbox(env, tilde, {
+        owner: context.github.owner,
+        pullNumber: context.github.pull_number,
+        repo: context.github.repo,
+      });
       sandbox = activeSandbox;
       signal.addEventListener("abort", () => void activeSandbox.close(), {
         once: true,
       });
       console.info(`Created Modal sandbox ${activeSandbox.id}.`);
-      const tools = {
-        ...Object.fromEntries(
-          Object.entries(remoteTools).filter(
-            ([name]) => !name.startsWith("modal_"),
-          ),
-        ),
-        ...activeSandbox.tools,
-      };
       const result = streamText({
         abortSignal: signal,
         messages: await convertToModelMessages(messages),
         model: openai(env.OPENAI_MODEL),
         stopWhen: stepCountIs(40),
         system: codeReviewPrompt(activeSandbox.id, context.github),
-        tools,
+        tools: remoteTools,
         async onError({ error }) {
           console.error("The code review failed.", error);
           await closeResources();

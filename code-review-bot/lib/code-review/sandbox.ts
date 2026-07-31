@@ -8,30 +8,27 @@ import {
   type Sandbox,
   type SandboxExecParams,
 } from "modal";
-import { tool, type ToolSet } from "ai";
-import { z } from "zod";
 import type { Env } from "@/lib/env";
-import { isSafeGitBranch } from "./git-ref";
-import { isWorkspacePath } from "./workspace-path";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const MAX_COMMAND_TIMEOUT_MS = 90 * 1000;
 const MAX_OUTPUT_CHARS = 40_000;
-const GITHUB_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
-const workspacePath = z
-  .string()
-  .refine(isWorkspacePath, "Path must be a normalized /workspace path");
-
 export type CodeReviewSandbox = {
   close(): Promise<void>;
   id: string;
-  tools: ToolSet;
+};
+
+type PullRequest = {
+  owner: string;
+  pullNumber: number;
+  repo: string;
 };
 
 export async function createCodeReviewSandbox(
   env: Env,
   client: Client,
+  pullRequest: PullRequest,
 ): Promise<CodeReviewSandbox> {
   const gitProxyUrl = new URL(
     reverseProxyPath({
@@ -99,6 +96,33 @@ export async function createCodeReviewSandbox(
       `http.${gitProxyUrl}/.extraHeader`,
       `x-tilde-org-id: ${env.TILDE_ORG_ID}`,
     ]);
+    const workdir = `/workspace/${pullRequest.repo}`;
+    await requireSuccessfulCommand(sandbox, [
+      "git",
+      "clone",
+      "--depth=1",
+      "--no-single-branch",
+      "--no-checkout",
+      `https://github.com/${pullRequest.owner}/${pullRequest.repo}.git`,
+      workdir,
+    ]);
+    await requireSuccessfulCommand(sandbox, [
+      "git",
+      "-C",
+      workdir,
+      "fetch",
+      "--depth=1",
+      "origin",
+      `+refs/pull/${pullRequest.pullNumber}/head:refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
+    ]);
+    await requireSuccessfulCommand(sandbox, [
+      "git",
+      "-C",
+      workdir,
+      "checkout",
+      "--detach",
+      `refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
+    ]);
   } catch (error) {
     await sandbox.terminate().catch(() => undefined);
     modal.close();
@@ -108,7 +132,6 @@ export async function createCodeReviewSandbox(
   let closed = false;
   return {
     id: sandbox.sandboxId,
-    tools: sandboxTools(sandbox),
     async close() {
       if (closed) return;
       closed = true;
@@ -143,91 +166,6 @@ function createModalClient(
       process.env.MODAL_SERVER_URL = previousServerUrl;
     }
   }
-}
-
-function sandboxTools(sandbox: Sandbox): ToolSet {
-  return {
-    sandbox_clone_pull_request: tool({
-      description:
-        "Clone a GitHub pull request through the sandbox's configured Tilde proxy.",
-      inputSchema: z.object({
-        baseRef: z
-          .string()
-          .refine(isSafeGitBranch, "baseRef must be a valid Git branch"),
-        owner: z.string().regex(GITHUB_NAME),
-        pullNumber: z.number().int().positive(),
-        repo: z.string().regex(GITHUB_NAME),
-      }),
-      execute: async ({ baseRef, owner, pullNumber, repo }) => {
-        const workdir = `/workspace/${repo}`;
-        await requireSuccessfulCommand(sandbox, [
-          "git",
-          "clone",
-          "--depth=1",
-          "--branch",
-          baseRef,
-          "--no-checkout",
-          `https://github.com/${owner}/${repo}.git`,
-          workdir,
-        ]);
-        await requireSuccessfulCommand(sandbox, [
-          "git",
-          "-C",
-          workdir,
-          "fetch",
-          "--depth=1",
-          "origin",
-          `+refs/pull/${pullNumber}/head:refs/remotes/origin/pull/${pullNumber}/head`,
-        ]);
-        await requireSuccessfulCommand(sandbox, [
-          "git",
-          "-C",
-          workdir,
-          "checkout",
-          "--detach",
-          `refs/remotes/origin/pull/${pullNumber}/head`,
-        ]);
-        const head = await runCommand(sandbox, ["git", "rev-parse", "HEAD"], {
-          workdir,
-        });
-        if (head.exitCode !== 0) {
-          throw new Error(`Unable to resolve pull request HEAD: ${head.stderr}`);
-        }
-        return { baseRef, headSha: head.stdout.trim(), workdir };
-      },
-    }),
-    sandbox_exec: tool({
-      description: "Execute one bounded command in the review sandbox.",
-      inputSchema: z.object({
-        command: z.array(z.string().min(1)).min(1),
-        timeoutMs: z
-          .number()
-          .int()
-          .positive()
-          .max(MAX_COMMAND_TIMEOUT_MS)
-          .optional(),
-        workdir: workspacePath.optional(),
-      }),
-      execute: ({ command, timeoutMs, workdir }) =>
-        runCommand(sandbox, command, { timeoutMs, workdir }),
-    }),
-    sandbox_list_files: tool({
-      description: "List a directory in the review sandbox.",
-      inputSchema: z.object({ path: workspacePath }),
-      execute: ({ path }) => sandbox.filesystem.listFiles(path),
-    }),
-    sandbox_read_file: tool({
-      description: "Read one UTF-8 file in the review sandbox.",
-      inputSchema: z.object({ path: workspacePath }),
-      execute: async ({ path }) =>
-        truncateOutput(await sandbox.filesystem.readText(path)),
-    }),
-    sandbox_stat: tool({
-      description: "Read metadata for a sandbox path.",
-      inputSchema: z.object({ path: workspacePath }),
-      execute: ({ path }) => sandbox.filesystem.stat(path),
-    }),
-  };
 }
 
 async function requireSuccessfulCommand(

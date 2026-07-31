@@ -19,8 +19,8 @@ Our agent uses a different boundary:
 2. Tilde converts the event into a signed ChatKit message.
 3. The Next.js endpoint verifies the signature and receives validated GitHub
    metadata.
-4. Tilde exposes an MCP server containing only the GitHub operations needed for
-   review.
+4. Tilde exposes one MCP server containing the GitHub review and Modal
+   inspection operations the agent needs.
 5. Tilde reverse proxies GitHub Git HTTPS and Modal gRPC, injecting credentials
    after the request leaves the agent.
 6. Modal runs untrusted repository checks in an ephemeral sandbox.
@@ -123,30 +123,24 @@ The endpoint validates this metadata at runtime. It also loads the ChatKit
 session history, so a reply such as “why is this P1?” has the review
 conversation needed to answer it.
 
-The agent can also be invoked directly through the same Vercel AI SDK endpoint.
-GitHub and direct chat are two delivery channels for one agent rather than two
+The agent can also be invoked directly through the same Vercel AI SDK endpoint
+when the caller includes validated GitHub pull-request metadata. GitHub and
+direct API calls are two delivery channels for one agent rather than two
 implementations.
 
 ## Give the model tools, not credentials
 
-The route connects to the Tilde MCP server and combines its remote GitHub tools
-with local sandbox tools:
+The route creates the sandbox, clones the pull request, and then gives the model
+the GitHub and Modal tools exposed by one Tilde MCP server:
 
 ```ts
 const { mcp, closeMcp } = await createMCPClient({
   client: tilde,
   serverId: env.TILDE_MCP_SERVER_ID,
 });
-const remoteTools = await mcp.tools();
-const sandbox = await createCodeReviewSandbox(env, tilde);
+const sandbox = await createCodeReviewSandbox(env, tilde, pullRequest);
 signal.addEventListener("abort", () => void sandbox.close(), { once: true });
-
-const tools = {
-  ...Object.fromEntries(
-    Object.entries(remoteTools).filter(([name]) => !name.startsWith("modal_")),
-  ),
-  ...sandbox.tools,
-};
+const tools = await mcp.tools();
 ```
 
 The application uses Modal's JavaScript SDK through Tilde's generic gRPC
@@ -183,15 +177,11 @@ the key can reach only the Tilde host, and the configuration is destroyed with
 the five-minute ephemeral sandbox. GitHub and Modal credentials remain inside
 Tilde and are never exposed to the sandbox.
 
-The local `sandbox_clone_pull_request` tool performs a depth-one clone of the
-PR's explicit base branch and fetches the pull ref before returning control to
-the model. It avoids partial-clone promisor state, which is fragile across HTTP
-proxies. Subsequent Git commands are ordinary commands and need no repeated
-proxy wrapper.
-
-Filesystem tools accept only normalized paths under `/workspace`; values such
-as `/workspace/../etc` are rejected before they reach Modal. Repository files,
-PR text, comments, command output, and tool results are treated as untrusted
+The endpoint performs a shallow clone of all branch tips and fetches the pull
+ref before invoking the model. The agent receives the sandbox ID in its system
+prompt and uses Tilde's Modal MCP tools for file inspection and bounded checks.
+It never needs a custom clone or filesystem tool. Repository files, PR text,
+comments, command output, and tool results are treated as untrusted
 evidence, not instructions that can change the target or tool policy.
 
 ## Review more than the patch
@@ -270,10 +260,11 @@ policy systems still decide whether a PR is approved.
 ## Deploy the same endpoint
 
 The Next.js route streams with Vercel AI SDK and sets a five-minute maximum
-duration. The same endpoint accepts direct ChatKit invocations and GitHub
-messages. An internal 285-second abort budget leaves time for cleanup before
-the hosting platform's hard limit. Error, abort, and finish callbacks await the
-same idempotent cleanup promise for the Modal sandbox and MCP client.
+duration. The same endpoint accepts GitHub messages and direct signed ChatKit
+invocations that include GitHub pull-request metadata. An internal 285-second
+abort budget leaves time for cleanup before the hosting platform's hard limit.
+Error, abort, and finish callbacks use the same cleanup routine for the Modal
+sandbox and MCP client.
 
 Deployment is:
 

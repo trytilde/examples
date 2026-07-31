@@ -83,11 +83,11 @@ tilde state import tilde-state.yaml .tilde/imports/code-review-output.yaml
 The state creates:
 
 - the HTTP/Vercel ChatKit agent;
-- a Vercel UI channel for direct AI SDK testing;
+- a Vercel UI channel for ChatKit conversations;
 - pending GitHub and Modal credential setup items;
 - GitHub and Modal tool providers;
-- a static MCP server containing only the GitHub read/review operations used by
-  this agent.
+- a static MCP server containing the GitHub review and Modal inspection
+  operations used by this agent.
 
 State cannot contain a GitHub App ID, installation ID, private key, webhook
 secret, or generated reverse-proxy profile ID. Those are credential-setup
@@ -207,8 +207,8 @@ found.
   endpoint and Vercel AI SDK loop.
 - [`lib/code-review/prompt.ts`](./lib/code-review/prompt.ts): review behavior and
   output contract.
-- [`lib/code-review/sandbox.ts`](./lib/code-review/sandbox.ts): Modal lifecycle
-  and local tools.
+- [`lib/code-review/sandbox.ts`](./lib/code-review/sandbox.ts): Modal lifecycle,
+  Git proxy setup, and pull-request checkout.
 - [`lib/tilde.ts`](./lib/tilde.ts): the single configured Harness SDK client.
 - [Tilde Harness SDK](https://github.com/trytilde/harness-sdk): ChatKit, MCP,
   reverse-proxy, and typed provider-context integration.
