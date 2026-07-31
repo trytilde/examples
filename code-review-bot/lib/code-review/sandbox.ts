@@ -12,7 +12,6 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Env } from "@/lib/env";
 import { isSafeGitBranch } from "./git-ref";
-import { gitProxyCommand, type GitProxyConfig } from "./git-proxy";
 import { isWorkspacePath } from "./workspace-path";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -34,6 +33,15 @@ export async function createCodeReviewSandbox(
   env: Env,
   client: Client,
 ): Promise<CodeReviewSandbox> {
+  const gitProxyUrl = new URL(
+    reverseProxyPath({
+      profileId: env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
+      teamId: client.config.teamId,
+    }),
+    client.config.baseUrl,
+  )
+    .toString()
+    .replace(/\/$/, "");
   const modalProxy = createTildeGrpcReverseProxy({
     client,
     profileId: env.TILDE_MODAL_PROXY_PROFILE_ID,
@@ -68,29 +76,39 @@ export async function createCodeReviewSandbox(
 
   try {
     await requireSuccessfulCommand(sandbox, ["mkdir", "-p", "/workspace"]);
+    await requireSuccessfulCommand(sandbox, [
+      "git",
+      "config",
+      "--global",
+      `url.${gitProxyUrl}/.insteadOf`,
+      "https://github.com/",
+    ]);
+    await requireSuccessfulCommand(sandbox, [
+      "git",
+      "config",
+      "--global",
+      "--add",
+      `http.${gitProxyUrl}/.extraHeader`,
+      `x-api-key: ${env.TILDE_API_KEY}`,
+    ]);
+    await requireSuccessfulCommand(sandbox, [
+      "git",
+      "config",
+      "--global",
+      "--add",
+      `http.${gitProxyUrl}/.extraHeader`,
+      `x-tilde-org-id: ${env.TILDE_ORG_ID}`,
+    ]);
   } catch (error) {
     await sandbox.terminate().catch(() => undefined);
     modal.close();
     throw error;
   }
 
-  const gitProxy: GitProxyConfig = {
-    apiKey: env.TILDE_API_KEY,
-    orgId: env.TILDE_ORG_ID,
-    proxyUrl: new URL(
-      reverseProxyPath({
-        profileId: env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
-        teamId: client.config.teamId,
-      }),
-      client.config.baseUrl,
-    )
-      .toString()
-      .replace(/\/$/, ""),
-  };
   let closed = false;
   return {
     id: sandbox.sandboxId,
-    tools: sandboxTools(sandbox, gitProxy),
+    tools: sandboxTools(sandbox),
     async close() {
       if (closed) return;
       closed = true;
@@ -127,11 +145,11 @@ function createModalClient(
   }
 }
 
-function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {
+function sandboxTools(sandbox: Sandbox): ToolSet {
   return {
     sandbox_clone_pull_request: tool({
       description:
-        "Clone a GitHub pull request through Tilde. Authentication is scoped to the clone/fetch processes and is never persisted.",
+        "Clone a GitHub pull request through the sandbox's configured Tilde proxy.",
       inputSchema: z.object({
         baseRef: z
           .string()
@@ -142,29 +160,25 @@ function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {
       }),
       execute: async ({ baseRef, owner, pullNumber, repo }) => {
         const workdir = `/workspace/${repo}`;
-        await requireSuccessfulCommand(
-          sandbox,
-          gitProxyCommand(gitProxy, [
-            "clone",
-            "--depth=1",
-            "--branch",
-            baseRef,
-            "--no-checkout",
-            `${gitProxy.proxyUrl}/${owner}/${repo}.git`,
-            workdir,
-          ]),
-        );
-        await requireSuccessfulCommand(
-          sandbox,
-          gitProxyCommand(gitProxy, [
-            "-C",
-            workdir,
-            "fetch",
-            "--depth=1",
-            "origin",
-            `+refs/pull/${pullNumber}/head:refs/remotes/origin/pull/${pullNumber}/head`,
-          ]),
-        );
+        await requireSuccessfulCommand(sandbox, [
+          "git",
+          "clone",
+          "--depth=1",
+          "--branch",
+          baseRef,
+          "--no-checkout",
+          `https://github.com/${owner}/${repo}.git`,
+          workdir,
+        ]);
+        await requireSuccessfulCommand(sandbox, [
+          "git",
+          "-C",
+          workdir,
+          "fetch",
+          "--depth=1",
+          "origin",
+          `+refs/pull/${pullNumber}/head:refs/remotes/origin/pull/${pullNumber}/head`,
+        ]);
         await requireSuccessfulCommand(sandbox, [
           "git",
           "-C",

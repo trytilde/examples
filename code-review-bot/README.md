@@ -46,8 +46,9 @@ sequenceDiagram
 ```
 
 The model never receives a GitHub installation token or Modal API key. The
-Tilde API key used to reach the proxies is passed only to the individual Git
-clone and fetch processes and is not written to the sandbox filesystem.
+ephemeral sandbox configures Git once to rewrite GitHub URLs through Tilde and
+adds the Tilde proxy headers to its global Git configuration. Sandbox egress is
+restricted to Tilde, and the configuration disappears when the sandbox stops.
 
 ## Prerequisites
 
@@ -188,7 +189,7 @@ found.
 - Limit GitHub App installation and the Tilde repository allowlist.
 - Keep the MCP server static; do not enable GitHub mutation tools unrelated to
   reviews.
-- Keep Git clone authentication process-scoped and out of `.gitconfig`.
+- Configure Git proxy authentication only inside the ephemeral sandbox.
 - Use webhook signature verification and reject stale requests.
 - Keep sandbox CPU, memory, execution time, output, and idle lifetime bounded.
 - Restrict sandbox egress to the configured Tilde reverse-proxy host.

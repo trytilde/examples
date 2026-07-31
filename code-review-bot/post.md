@@ -159,33 +159,35 @@ to the configured Tilde reverse-proxy host. Its image contains Git, GitHub CLI,
 ripgrep, jq, and pnpm. Modal caches the image layers, so tools do not need to
 be installed interactively for every review.
 
-## Clone without leaving a credential behind
+## Configure Git once per sandbox
 
 Git itself needs access to a private repository. Tilde provides a second
 reverse-proxy profile for GitHub Git HTTPS.
 
-A subtle mistake is to write the Tilde API key into global `.gitconfig`. A
-model with a shell tool can read that file.
-
-The example instead adds authentication only to one Git process:
+The example configures the sandbox's global Git settings once. GitHub URLs are
+rewritten through Tilde, and every later Git command uses the same proxy:
 
 ```ts
-return [
+await run(sandbox, [
   "git",
-  "-c",
-  `http.${proxyUrl}/.extraHeader=x-api-key: ${apiKey}`,
-  "-c",
-  `http.${proxyUrl}/.extraHeader=x-tilde-org-id: ${orgId}`,
-  "clone",
-  repositoryUrl,
-];
+  "config",
+  "--global",
+  `url.${proxyUrl}/.insteadOf`,
+  "https://github.com/",
+]);
 ```
+
+The sandbox also stores the Tilde API key and organization header in its global
+Git configuration. This is a deliberate simplicity tradeoff for the example:
+the key can reach only the Tilde host, and the configuration is destroyed with
+the five-minute ephemeral sandbox. GitHub and Modal credentials remain inside
+Tilde and are never exposed to the sandbox.
 
 The local `sandbox_clone_pull_request` tool performs a depth-one clone of the
 PR's explicit base branch and fetches the pull ref before returning control to
 the model. It avoids partial-clone promisor state, which is fragile across HTTP
-proxies. Nothing is written to Git configuration, and subsequent model-driven
-shell commands do not contain the key.
+proxies. Subsequent Git commands are ordinary commands and need no repeated
+proxy wrapper.
 
 Filesystem tools accept only normalized paths under `/workspace`; values such
 as `/workspace/../etc` are rejected before they reach Modal. Repository files,
