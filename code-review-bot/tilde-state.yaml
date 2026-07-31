@@ -12,14 +12,6 @@ resources:
     displayName: Code Review
     enabled: true
     endpointUrl: https://YOUR_DEPLOYMENT.example/api/code-review
-  chatkit/provider/code-review:
-    refs:
-      default_agent: chatkit/agent/code-review
-    defaultAgentInboxId: code-review
-    desiredEnabled: true
-    displayName: Code Review
-    providerConfiguration: {}
-    providerId: chatkit.channel.vercel-ui
   credential/setup_item/github:
     credentialSourceTypeId: server_token_exchange
     desiredEnabled: true
@@ -77,6 +69,41 @@ resources:
     displayName: Code Review
     isDynamicToolDiscovery: false
     functions:
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Inspect the request-scoped code review sandbox.
+        toolGroupInstanceId: modal-sandbox
+        toolGroupSourceTypeId: modal_sandbox
+        toolName: modal_get_sandbox
+        toolSourceTypeId: modal_get_sandbox
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Read a file in the request-scoped code review sandbox.
+        toolGroupInstanceId: modal-sandbox
+        toolGroupSourceTypeId: modal_sandbox
+        toolName: modal_read_file
+        toolSourceTypeId: modal_read_file
+      - configuredParams: {}
+        enabled: true
+        toolDescription: List a directory in the request-scoped code review sandbox.
+        toolGroupInstanceId: modal-sandbox
+        toolGroupSourceTypeId: modal_sandbox
+        toolName: modal_list_dir
+        toolSourceTypeId: modal_list_dir
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Inspect a path in the request-scoped code review sandbox.
+        toolGroupInstanceId: modal-sandbox
+        toolGroupSourceTypeId: modal_sandbox
+        toolName: modal_stat
+        toolSourceTypeId: modal_stat
+      - configuredParams: {}
+        enabled: true
+        toolDescription: Run a bounded command in the request-scoped code review sandbox.
+        toolGroupInstanceId: modal-sandbox
+        toolGroupSourceTypeId: modal_sandbox
+        toolName: modal_exec_command
+        toolSourceTypeId: modal_exec_command
       - configuredParams: {}
         enabled: true
         toolDescription: Read pull request metadata and the current head commit.

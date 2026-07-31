@@ -1,3 +1,8 @@
+import {
+  chatKitEndpoint,
+  convertToAiSdkMessages,
+  createMCPClient,
+} from "@trytilde/harness-sdk-vercel-ai-node";
 import { openai } from "@ai-sdk/openai";
 import {
   consumeStream,
@@ -11,80 +16,89 @@ import {
   type CodeReviewSandbox,
 } from "@/lib/code-review/sandbox";
 import { env } from "@/lib/env";
-import { chatKitEndpoint } from "@/lib/tilde/chatkit";
-import { createTildeMcpClient } from "@/lib/tilde/mcp";
-import type { TildeConfig } from "@/lib/tilde/types";
+import { tilde } from "@/lib/tilde";
 
 export const maxDuration = 300;
-
-const tilde: TildeConfig = {
-  apiKey: env.TILDE_API_KEY,
-  baseUrl: env.TILDE_BASE_URL,
-  orgId: env.TILDE_ORG_ID,
-  teamId: env.TILDE_TEAM_ID,
-};
+const REQUEST_TIMEOUT_MS = 285_000;
 
 export const POST = chatKitEndpoint({
-  config: tilde,
+  client: tilde,
   webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
   async handler(request, context) {
-    const startedAt = Date.now();
-    const messages = [...(await context.history()), ...context.messages];
-    const { mcp, closeMcp } = await createTildeMcpClient(
-      tilde,
-      env.TILDE_MCP_SERVER_ID,
-    );
+    const github = context.github;
+    if (!github) {
+      throw new Error("The code review agent only accepts GitHub messages.");
+    }
+    if (!github.owner || !github.repo || !github.pull_number) {
+      throw new Error("The GitHub message must identify a pull request.");
+    }
+    const signal = AbortSignal.any([
+      request.signal,
+      AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    ]);
+    const history = await context.session.history();
+    const messages = await convertToAiSdkMessages({
+      messages: [...history.items, ...context.messages],
+      chatkit: context.chatkit,
+    });
+    const { mcp, closeMcp } = await createMCPClient({
+      client: tilde,
+      serverId: env.TILDE_MCP_SERVER_ID,
+    });
+    console.info("Connected to the Tilde MCP server.");
     let sandbox: CodeReviewSandbox | undefined;
+
+    async function closeResources() {
+      const results = await Promise.allSettled([sandbox?.close(), closeMcp()]);
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.error(
+            "Could not clean up a code review resource.",
+            result.reason,
+          );
+        }
+      }
+    }
 
     try {
       const remoteTools = await mcp.tools();
-      const activeSandbox = await createCodeReviewSandbox(
-        env,
-        tilde,
-        request.signal,
-      );
+      console.info(`Loaded ${Object.keys(remoteTools).length} MCP tools.`);
+      const activeSandbox = await createCodeReviewSandbox(env, tilde, {
+        owner: github.owner,
+        pullNumber: github.pull_number,
+        repo: github.repo,
+      });
       sandbox = activeSandbox;
-      const tools = {
-        ...Object.fromEntries(
-          Object.entries(remoteTools).filter(
-            ([name]) => !name.startsWith("modal_"),
-          ),
-        ),
-        ...activeSandbox.tools,
-      };
+      signal.addEventListener("abort", () => void activeSandbox.close(), {
+        once: true,
+      });
+      console.info(`Created Modal sandbox ${activeSandbox.id}.`);
       const result = streamText({
-        abortSignal: request.signal,
+        abortSignal: signal,
         messages: await convertToModelMessages(messages),
         model: openai(env.OPENAI_MODEL),
         stopWhen: stepCountIs(40),
-        system: codeReviewPrompt(activeSandbox.id, context.github),
-        tools,
-        onError({ error }) {
-          console.error("code_review_failed", {
-            error,
-            sandboxId: activeSandbox.id,
-            sessionId: context.sessionId,
-          });
-          void activeSandbox.close().finally(closeMcp);
+        system: codeReviewPrompt(activeSandbox.id, github),
+        tools: remoteTools,
+        async onError({ error }) {
+          console.error("The code review failed.", error);
+          await closeResources();
+        },
+        async onAbort() {
+          console.warn("The code review was cancelled.");
+          await closeResources();
         },
         onStepFinish({ stepNumber, toolCalls }) {
-          console.info("code_review_step", {
-            sessionId: context.sessionId,
-            stepNumber,
-            tools: toolCalls.map(({ toolName }) => toolName),
-          });
+          const names = toolCalls.map(({ toolName }) => toolName).join(", ");
+          console.info(
+            names
+              ? `Finished step ${stepNumber} using ${names}.`
+              : `Finished step ${stepNumber}.`,
+          );
         },
-        async onFinish({ finishReason, steps, text }) {
-          console.info("code_review_completed", {
-            durationMs: Date.now() - startedAt,
-            finishReason,
-            responseLength: text.length,
-            sandboxId: activeSandbox.id,
-            sessionId: context.sessionId,
-            stepCount: steps.length,
-          });
-          await activeSandbox.close();
-          await closeMcp();
+        async onFinish({ steps }) {
+          console.info(`Completed the code review in ${steps.length} steps.`);
+          await closeResources();
         },
       });
 
@@ -93,8 +107,7 @@ export const POST = chatKitEndpoint({
         originalMessages: messages,
       });
     } catch (error) {
-      await sandbox?.close();
-      await closeMcp();
+      await closeResources();
       throw error;
     }
   },

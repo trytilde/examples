@@ -46,8 +46,9 @@ sequenceDiagram
 ```
 
 The model never receives a GitHub installation token or Modal API key. The
-Tilde API key used to reach the proxies is passed only to the individual Git
-clone and fetch processes and is not written to the sandbox filesystem.
+ephemeral sandbox configures Git once to rewrite GitHub URLs through Tilde and
+adds the Tilde proxy headers to its global Git configuration. Sandbox egress is
+restricted to Tilde, and the configuration disappears when the sandbox stops.
 
 ## Prerequisites
 
@@ -82,11 +83,10 @@ tilde state import tilde-state.yaml .tilde/imports/code-review-output.yaml
 The state creates:
 
 - the HTTP/Vercel ChatKit agent;
-- a Vercel UI channel for direct AI SDK testing;
 - pending GitHub and Modal credential setup items;
 - GitHub and Modal tool providers;
-- a static MCP server containing only the GitHub read/review operations used by
-  this agent.
+- a static MCP server containing the GitHub review and Modal inspection
+  operations used by this agent.
 
 State cannot contain a GitHub App ID, installation ID, private key, webhook
 secret, or generated reverse-proxy profile ID. Those are credential-setup
@@ -188,10 +188,13 @@ found.
 - Limit GitHub App installation and the Tilde repository allowlist.
 - Keep the MCP server static; do not enable GitHub mutation tools unrelated to
   reviews.
-- Keep Git clone authentication process-scoped and out of `.gitconfig`.
+- Configure Git proxy authentication only inside the ephemeral sandbox.
 - Use webhook signature verification and reject stale requests.
 - Keep sandbox CPU, memory, execution time, output, and idle lifetime bounded.
+- Restrict sandbox egress to the configured Tilde reverse-proxy host.
 - Do not inject platform credentials into the sandbox.
+- Keep request timeout below the hosting platform's hard function limit and
+  await idempotent MCP and sandbox cleanup.
 - Re-read GitHub state after every write.
 - Monitor tool errors, model finish reasons, review duration, and sandbox
   termination failures.
@@ -203,11 +206,12 @@ found.
   endpoint and Vercel AI SDK loop.
 - [`lib/code-review/prompt.ts`](./lib/code-review/prompt.ts): review behavior and
   output contract.
-- [`lib/code-review/sandbox.ts`](./lib/code-review/sandbox.ts): Modal lifecycle
-  and local tools.
-- [`lib/tilde`](./lib/tilde): the small public adapter used by this example.
+- [`lib/code-review/sandbox.ts`](./lib/code-review/sandbox.ts): Modal lifecycle,
+  Git proxy setup, and pull-request checkout.
+- [`lib/tilde.ts`](./lib/tilde.ts): the single configured Harness SDK client.
+- [Tilde Harness SDK](https://github.com/trytilde/harness-sdk): ChatKit, MCP,
+  reverse-proxy, and typed provider-context integration.
 - [`tilde-state.yaml`](./tilde-state.yaml): portable Tilde resources.
-- [`post.md`](./post.md): draft article explaining the design.
 
 ## Limitations
 

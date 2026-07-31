@@ -1,205 +1,163 @@
 import {
+  createTildeGrpcReverseProxy,
+  reverseProxyPath,
+  type Client,
+} from "@trytilde/harness-sdk";
+import {
   ModalClient,
   type Sandbox,
   type SandboxExecParams,
 } from "modal";
-import { tool, type ToolSet } from "ai";
-import { z } from "zod";
+import { parseArgsStringToArgv } from "string-argv";
 import type { Env } from "@/lib/env";
-import { createTildeGrpcReverseProxy } from "@/lib/tilde/grpc-reverse-proxy";
-import { reverseProxyUrl } from "@/lib/tilde/paths";
-import type { TildeConfig } from "@/lib/tilde/types";
-import { gitProxyCommand, type GitProxyConfig } from "./git-proxy";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const MAX_COMMAND_TIMEOUT_MS = 90 * 1000;
 const MAX_OUTPUT_CHARS = 40_000;
-const GITHUB_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
-const workspacePath = z
-  .string()
-  .refine(
-    (value) => value === "/workspace" || value.startsWith("/workspace/"),
-    "Path must be /workspace or one of its descendants",
-  );
-
 export type CodeReviewSandbox = {
   close(): Promise<void>;
   id: string;
-  tools: ToolSet;
+};
+
+type PullRequest = {
+  owner: string;
+  pullNumber: number;
+  repo: string;
 };
 
 export async function createCodeReviewSandbox(
   env: Env,
-  config: TildeConfig,
-  abortSignal: AbortSignal,
+  client: Client,
+  pullRequest: PullRequest,
 ): Promise<CodeReviewSandbox> {
-  const modalProxy = createTildeGrpcReverseProxy(
-    config,
-    env.TILDE_MODAL_PROXY_PROFILE_ID,
-  );
-  // Modal 0.9 exposes endpoint but still reads the control-plane target from
-  // MODAL_SERVER_URL.
-  process.env.MODAL_SERVER_URL = modalProxy.endpoint;
-  const modal = new ModalClient({
-    endpoint: modalProxy.endpoint,
-    grpcMiddleware: [modalProxy.middleware],
-    tokenId: "tilde-reverse-proxy",
-    tokenSecret: "tilde-reverse-proxy",
+  const gitProxyUrl = new URL(
+    reverseProxyPath({
+      profileId: env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
+      teamId: client.config.teamId,
+    }),
+    client.config.baseUrl,
+  )
+    .toString()
+    .replace(/\/$/, "");
+  const modalProxy = createTildeGrpcReverseProxy({
+    client,
+    profileId: env.TILDE_MODAL_PROXY_PROFILE_ID,
   });
-  const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, {
-    createIfMissing: true,
-  });
-  const image = modal.images
-    .fromRegistry("node:22-bookworm")
-    .dockerfileCommands([
-      "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git gh jq ripgrep && rm -rf /var/lib/apt/lists/*",
-      "RUN npm install --global pnpm@10",
-    ]);
-  const sandbox = await modal.sandboxes.create(app, image, {
-    cpu: 2,
-    idleTimeoutMs: FIVE_MINUTES_MS,
-    memoryMiB: 2048,
-    tags: { agent: "code-review" },
-    timeoutMs: THIRTY_MINUTES_MS,
-  });
-  abortSignal.addEventListener(
-    "abort",
-    () => {
-      void sandbox.terminate().catch(() => undefined);
-      modal.close();
-    },
-    { once: true },
-  );
+  const modal = createModalClient(modalProxy);
+  let sandbox: Sandbox | undefined;
+  let closed = false;
+
+  async function close() {
+    if (closed) return;
+    closed = true;
+    const activeSandbox = sandbox;
+    await activeSandbox?.terminate().catch((error) => {
+      console.error(
+        `Could not stop Modal sandbox ${activeSandbox.sandboxId}.`,
+        error,
+      );
+    });
+    modal.close();
+  }
 
   try {
-    await requireSuccessfulCommand(sandbox, ["mkdir", "-p", "/workspace"]);
+    const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, {
+      createIfMissing: true,
+    });
+    const image = modal.images
+      .fromRegistry("node:22-bookworm")
+      .dockerfileCommands([
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git gh jq ripgrep && rm -rf /var/lib/apt/lists/*",
+        "RUN npm install --global pnpm@10",
+      ]);
+    sandbox = await modal.sandboxes.create(app, image, {
+      cpu: 2,
+      cpuLimit: 2,
+      idleTimeoutMs: FIVE_MINUTES_MS,
+      memoryMiB: 2048,
+      memoryLimitMiB: 2048,
+      outboundDomainAllowlist: [new URL(client.config.baseUrl).hostname],
+      tags: { agent: "code-review" },
+      timeoutMs: THIRTY_MINUTES_MS,
+    });
   } catch (error) {
-    await sandbox.terminate().catch(() => undefined);
-    modal.close();
+    await close();
     throw error;
   }
 
-  const gitProxy: GitProxyConfig = {
-    apiKey: config.apiKey,
-    orgId: config.orgId,
-    proxyUrl: reverseProxyUrl(
-      config,
-      env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
-    ).replace(/\/$/, ""),
-  };
-  let closed = false;
+  try {
+    await requireSuccessfulCommand(sandbox, "mkdir -p /workspace");
+    await requireSuccessfulCommand(
+      sandbox,
+      `git config --global url.${gitProxyUrl}/.insteadOf https://github.com/`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git config --global --add http.${gitProxyUrl}/.extraHeader "x-api-key: ${env.TILDE_API_KEY}"`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git config --global --add http.${gitProxyUrl}/.extraHeader "x-tilde-org-id: ${env.TILDE_ORG_ID}"`,
+    );
+    const workdir = `/workspace/${pullRequest.repo}`;
+    await requireSuccessfulCommand(
+      sandbox,
+      `git clone --depth=1 --no-single-branch --no-checkout https://github.com/${pullRequest.owner}/${pullRequest.repo}.git ${workdir}`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git -C ${workdir} fetch --depth=1 origin +refs/pull/${pullRequest.pullNumber}/head:refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git -C ${workdir} checkout --detach refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
+    );
+  } catch (error) {
+    await close();
+    throw error;
+  }
+
   return {
+    close,
     id: sandbox.sandboxId,
-    tools: sandboxTools(sandbox, gitProxy),
-    async close() {
-      if (closed) return;
-      closed = true;
-      await sandbox.terminate().catch((error) => {
-        console.error("sandbox_termination_failed", {
-          error,
-          sandboxId: sandbox.sandboxId,
-        });
-      });
-      modal.close();
-    },
   };
 }
 
-function sandboxTools(sandbox: Sandbox, gitProxy: GitProxyConfig): ToolSet {
-  return {
-    sandbox_clone_pull_request: tool({
-      description:
-        "Clone a GitHub pull request through Tilde. Authentication is scoped to the clone/fetch processes and is never persisted.",
-      inputSchema: z.object({
-        owner: z.string().regex(GITHUB_NAME),
-        pullNumber: z.number().int().positive(),
-        repo: z.string().regex(GITHUB_NAME),
-      }),
-      execute: async ({ owner, pullNumber, repo }) => {
-        const workdir = `/workspace/${repo}`;
-        await requireSuccessfulCommand(
-          sandbox,
-          gitProxyCommand(gitProxy, [
-            "clone",
-            "--filter=blob:none",
-            "--no-checkout",
-            `${gitProxy.proxyUrl}/${owner}/${repo}.git`,
-            workdir,
-          ]),
-        );
-        await requireSuccessfulCommand(
-          sandbox,
-          gitProxyCommand(gitProxy, [
-            "-C",
-            workdir,
-            "fetch",
-            "origin",
-            `+refs/pull/${pullNumber}/head:refs/remotes/origin/pull/${pullNumber}/head`,
-          ]),
-        );
-        await requireSuccessfulCommand(sandbox, [
-          "git",
-          "-C",
-          workdir,
-          "checkout",
-          "--detach",
-          `refs/remotes/origin/pull/${pullNumber}/head`,
-        ]);
-        const head = await runCommand(sandbox, ["git", "rev-parse", "HEAD"], {
-          workdir,
-        });
-        if (head.exitCode !== 0) {
-          throw new Error(`Unable to resolve pull request HEAD: ${head.stderr}`);
-        }
-        return { headSha: head.stdout.trim(), workdir };
-      },
-    }),
-    sandbox_exec: tool({
-      description: "Execute one bounded command in the review sandbox.",
-      inputSchema: z.object({
-        command: z.array(z.string().min(1)).min(1),
-        timeoutMs: z
-          .number()
-          .int()
-          .positive()
-          .max(MAX_COMMAND_TIMEOUT_MS)
-          .optional(),
-        workdir: workspacePath.optional(),
-      }),
-      execute: ({ command, timeoutMs, workdir }) =>
-        runCommand(sandbox, command, { timeoutMs, workdir }),
-    }),
-    sandbox_list_files: tool({
-      description: "List a directory in the review sandbox.",
-      inputSchema: z.object({ path: workspacePath }),
-      execute: ({ path }) => sandbox.filesystem.listFiles(path),
-    }),
-    sandbox_read_file: tool({
-      description: "Read one UTF-8 file in the review sandbox.",
-      inputSchema: z.object({ path: workspacePath }),
-      execute: async ({ path }) =>
-        truncateOutput(await sandbox.filesystem.readText(path)),
-    }),
-    sandbox_stat: tool({
-      description: "Read metadata for a sandbox path.",
-      inputSchema: z.object({ path: workspacePath }),
-      execute: ({ path }) => sandbox.filesystem.stat(path),
-    }),
-  };
+function createModalClient(
+  proxy: ReturnType<typeof createTildeGrpcReverseProxy>,
+): ModalClient {
+  // Modal 0.9 declares `endpoint` but reads MODAL_SERVER_URL synchronously.
+  const previousServerUrl = process.env.MODAL_SERVER_URL;
+  process.env.MODAL_SERVER_URL = proxy.endpoint;
+  try {
+    return new ModalClient({
+      endpoint: proxy.endpoint,
+      grpcMiddleware: [proxy.middleware],
+      tokenId: "tilde-reverse-proxy",
+      tokenSecret: "tilde-reverse-proxy",
+    });
+  } finally {
+    if (previousServerUrl === undefined) {
+      delete process.env.MODAL_SERVER_URL;
+    } else {
+      process.env.MODAL_SERVER_URL = previousServerUrl;
+    }
+  }
 }
 
 async function requireSuccessfulCommand(
   sandbox: Sandbox,
-  command: string[],
+  command: string,
 ): Promise<void> {
-  const result = await runCommand(sandbox, command, {
+  const argv = parseArgsStringToArgv(command);
+  const result = await runCommand(sandbox, argv, {
     timeoutMs: MAX_COMMAND_TIMEOUT_MS,
     workdir: "/",
   });
   if (result.exitCode !== 0) {
     throw new Error(
-      `Sandbox command failed (${command[0]}): ${result.stderr || result.stdout}`,
+      `Sandbox command failed (${argv[0]}): ${result.stderr || result.stdout}`,
     );
   }
 }

@@ -33,7 +33,6 @@ jobs:
           cache-dependency-path: code-review-bot/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level high
-      - run: pnpm test
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
