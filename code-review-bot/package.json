@@ -32,13 +32,13 @@
   "dependencies": {
     "@ai-sdk/mcp": "1.0.59",
     "@ai-sdk/openai": "3.0.81",
+    "@trytilde/harness-sdk": "0.1.2",
+    "@trytilde/harness-sdk-vercel-ai-node": "0.1.2",
     "ai": "6.0.220",
     "modal": "0.9.0",
     "next": "16.2.12",
-    "nice-grpc": "2.1.16",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "tilde-harness-sdk": "git+https://github.com/trytilde/harness-sdk.git#a1868803df1ea4283e74f88424024635d5a58d88",
     "zod": "4.4.3"
   },
   "devDependencies": {

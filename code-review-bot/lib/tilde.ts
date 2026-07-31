@@ -1,4 +1,4 @@
-import { createClient } from "@tilde/harness-sdk";
+import { createClient } from "@trytilde/harness-sdk";
 import { env } from "./env";
 
 export const tilde = createClient({

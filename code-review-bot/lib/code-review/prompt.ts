@@ -1,4 +1,4 @@
-import type { GitHubChatKitMessageMetadata } from "@tilde/harness-sdk-vercel-ai-node";
+import type { GitHubChatKitMessageMetadata } from "@trytilde/harness-sdk-vercel-ai-node";
 
 export function codeReviewPrompt(
   sandboxId: string,

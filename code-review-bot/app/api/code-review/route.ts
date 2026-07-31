@@ -2,7 +2,7 @@ import {
   chatKitEndpoint,
   convertToAiSdkMessages,
   createMCPClient,
-} from "@tilde/harness-sdk-vercel-ai-node";
+} from "@trytilde/harness-sdk-vercel-ai-node";
 import { openai } from "@ai-sdk/openai";
 import {
   consumeStream,

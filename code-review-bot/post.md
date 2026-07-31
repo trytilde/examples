@@ -65,7 +65,7 @@ The application creates one Tilde client and reuses it for ChatKit, MCP, and
 reverse-proxy routing:
 
 ```ts
-import { createClient } from "@tilde/harness-sdk";
+import { createClient } from "@trytilde/harness-sdk";
 
 export const tilde = createClient({
   apiKey: env.TILDE_API_KEY,

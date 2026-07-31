@@ -2,7 +2,7 @@ import {
   createTildeGrpcReverseProxy,
   reverseProxyPath,
   type Client,
-} from "@tilde/harness-sdk";
+} from "@trytilde/harness-sdk";
 import {
   ModalClient,
   type Sandbox,
