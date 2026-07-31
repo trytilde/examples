@@ -12,14 +12,6 @@ resources:
     displayName: Code Review
     enabled: true
     endpointUrl: https://YOUR_DEPLOYMENT.example/api/code-review
-  chatkit/provider/code-review:
-    refs:
-      default_agent: chatkit/agent/code-review
-    defaultAgentInboxId: code-review
-    desiredEnabled: true
-    displayName: Code Review
-    providerConfiguration: {}
-    providerId: chatkit.channel.vercel-ui
   credential/setup_item/github:
     credentialSourceTypeId: server_token_exchange
     desiredEnabled: true

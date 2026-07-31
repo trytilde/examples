@@ -83,7 +83,6 @@ tilde state import tilde-state.yaml .tilde/imports/code-review-output.yaml
 The state creates:
 
 - the HTTP/Vercel ChatKit agent;
-- a Vercel UI channel for ChatKit conversations;
 - pending GitHub and Modal credential setup items;
 - GitHub and Modal tool providers;
 - a static MCP server containing the GitHub review and Modal inspection

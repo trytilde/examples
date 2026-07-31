@@ -123,10 +123,8 @@ The endpoint validates this metadata at runtime. It also loads the ChatKit
 session history, so a reply such as “why is this P1?” has the review
 conversation needed to answer it.
 
-The agent can also be invoked directly through the same Vercel AI SDK endpoint
-when the caller includes validated GitHub pull-request metadata. GitHub and
-direct API calls are two delivery channels for one agent rather than two
-implementations.
+The endpoint uses the Vercel AI SDK streaming protocol, but accepts only signed
+ChatKit messages with validated GitHub pull-request metadata.
 
 ## Give the model tools, not credentials
 
@@ -260,11 +258,10 @@ policy systems still decide whether a PR is approved.
 ## Deploy the same endpoint
 
 The Next.js route streams with Vercel AI SDK and sets a five-minute maximum
-duration. The same endpoint accepts GitHub messages and direct signed ChatKit
-invocations that include GitHub pull-request metadata. An internal 285-second
-abort budget leaves time for cleanup before the hosting platform's hard limit.
-Error, abort, and finish callbacks use the same cleanup routine for the Modal
-sandbox and MCP client.
+duration. It rejects every request without validated GitHub pull-request
+metadata. An internal 285-second abort budget leaves time for cleanup before
+the hosting platform's hard limit. Error, abort, and finish callbacks use the
+same cleanup routine for the Modal sandbox and MCP client.
 
 Deployment is:
 
