@@ -56,12 +56,11 @@ export const POST = chatKitEndpoint({
     try {
       const remoteTools = await mcp.tools();
       console.info(`Loaded ${Object.keys(remoteTools).length} MCP tools.`);
-      const activeSandbox = await createCodeReviewSandbox(
-        env,
-        tilde,
-        signal,
-      );
+      const activeSandbox = await createCodeReviewSandbox(env, tilde);
       sandbox = activeSandbox;
+      signal.addEventListener("abort", () => void activeSandbox.close(), {
+        once: true,
+      });
       console.info(`Created Modal sandbox ${activeSandbox.id}.`);
       const tools = {
         ...Object.fromEntries(

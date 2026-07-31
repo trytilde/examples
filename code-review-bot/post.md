@@ -138,7 +138,8 @@ const { mcp, closeMcp } = await createMCPClient({
   serverId: env.TILDE_MCP_SERVER_ID,
 });
 const remoteTools = await mcp.tools();
-const sandbox = await createCodeReviewSandbox(env, tilde, signal);
+const sandbox = await createCodeReviewSandbox(env, tilde);
+signal.addEventListener("abort", () => void sandbox.close(), { once: true });
 
 const tools = {
   ...Object.fromEntries(

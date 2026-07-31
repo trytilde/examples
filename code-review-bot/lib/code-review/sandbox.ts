@@ -33,9 +33,7 @@ export type CodeReviewSandbox = {
 export async function createCodeReviewSandbox(
   env: Env,
   client: Client,
-  abortSignal: AbortSignal,
 ): Promise<CodeReviewSandbox> {
-  abortSignal.throwIfAborted();
   const modalProxy = createTildeGrpcReverseProxy({
     client,
     profileId: env.TILDE_MODAL_PROXY_PROFILE_ID,
@@ -43,11 +41,9 @@ export async function createCodeReviewSandbox(
   const modal = createModalClient(modalProxy);
   let sandbox: Sandbox | undefined;
   try {
-    abortSignal.throwIfAborted();
     const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, {
       createIfMissing: true,
     });
-    abortSignal.throwIfAborted();
     const image = modal.images
       .fromRegistry("node:22-bookworm")
       .dockerfileCommands([
@@ -69,22 +65,10 @@ export async function createCodeReviewSandbox(
     modal.close();
     throw error;
   }
-  const abort = () => {
-    void sandbox
-      .terminate()
-      .catch(() => undefined)
-      .finally(() => modal.close());
-  };
-  abortSignal.addEventListener("abort", abort, { once: true });
-  if (abortSignal.aborted) {
-    abort();
-    abortSignal.throwIfAborted();
-  }
 
   try {
     await requireSuccessfulCommand(sandbox, ["mkdir", "-p", "/workspace"]);
   } catch (error) {
-    abortSignal.removeEventListener("abort", abort);
     await sandbox.terminate().catch(() => undefined);
     modal.close();
     throw error;
@@ -110,7 +94,6 @@ export async function createCodeReviewSandbox(
     async close() {
       if (closed) return;
       closed = true;
-      abortSignal.removeEventListener("abort", abort);
       await sandbox.terminate().catch((error) => {
         console.error(
           `Could not stop Modal sandbox ${sandbox.sandboxId}.`,
