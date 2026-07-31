@@ -8,6 +8,7 @@ import {
   type Sandbox,
   type SandboxExecParams,
 } from "modal";
+import { parseArgsStringToArgv } from "string-argv";
 import type { Env } from "@/lib/env";
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -72,57 +73,32 @@ export async function createCodeReviewSandbox(
   }
 
   try {
-    await requireSuccessfulCommand(sandbox, ["mkdir", "-p", "/workspace"]);
-    await requireSuccessfulCommand(sandbox, [
-      "git",
-      "config",
-      "--global",
-      `url.${gitProxyUrl}/.insteadOf`,
-      "https://github.com/",
-    ]);
-    await requireSuccessfulCommand(sandbox, [
-      "git",
-      "config",
-      "--global",
-      "--add",
-      `http.${gitProxyUrl}/.extraHeader`,
-      `x-api-key: ${env.TILDE_API_KEY}`,
-    ]);
-    await requireSuccessfulCommand(sandbox, [
-      "git",
-      "config",
-      "--global",
-      "--add",
-      `http.${gitProxyUrl}/.extraHeader`,
-      `x-tilde-org-id: ${env.TILDE_ORG_ID}`,
-    ]);
+    await requireSuccessfulCommand(sandbox, "mkdir -p /workspace");
+    await requireSuccessfulCommand(
+      sandbox,
+      `git config --global url.${gitProxyUrl}/.insteadOf https://github.com/`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git config --global --add http.${gitProxyUrl}/.extraHeader "x-api-key: ${env.TILDE_API_KEY}"`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git config --global --add http.${gitProxyUrl}/.extraHeader "x-tilde-org-id: ${env.TILDE_ORG_ID}"`,
+    );
     const workdir = `/workspace/${pullRequest.repo}`;
-    await requireSuccessfulCommand(sandbox, [
-      "git",
-      "clone",
-      "--depth=1",
-      "--no-single-branch",
-      "--no-checkout",
-      `https://github.com/${pullRequest.owner}/${pullRequest.repo}.git`,
-      workdir,
-    ]);
-    await requireSuccessfulCommand(sandbox, [
-      "git",
-      "-C",
-      workdir,
-      "fetch",
-      "--depth=1",
-      "origin",
-      `+refs/pull/${pullRequest.pullNumber}/head:refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
-    ]);
-    await requireSuccessfulCommand(sandbox, [
-      "git",
-      "-C",
-      workdir,
-      "checkout",
-      "--detach",
-      `refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
-    ]);
+    await requireSuccessfulCommand(
+      sandbox,
+      `git clone --depth=1 --no-single-branch --no-checkout https://github.com/${pullRequest.owner}/${pullRequest.repo}.git ${workdir}`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git -C ${workdir} fetch --depth=1 origin +refs/pull/${pullRequest.pullNumber}/head:refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
+    );
+    await requireSuccessfulCommand(
+      sandbox,
+      `git -C ${workdir} checkout --detach refs/remotes/origin/pull/${pullRequest.pullNumber}/head`,
+    );
   } catch (error) {
     await sandbox.terminate().catch(() => undefined);
     modal.close();
@@ -170,15 +146,16 @@ function createModalClient(
 
 async function requireSuccessfulCommand(
   sandbox: Sandbox,
-  command: string[],
+  command: string,
 ): Promise<void> {
-  const result = await runCommand(sandbox, command, {
+  const argv = parseArgsStringToArgv(command);
+  const result = await runCommand(sandbox, argv, {
     timeoutMs: MAX_COMMAND_TIMEOUT_MS,
     workdir: "/",
   });
   if (result.exitCode !== 0) {
     throw new Error(
-      `Sandbox command failed (${command[0]}): ${result.stderr || result.stdout}`,
+      `Sandbox command failed (${argv[0]}): ${result.stderr || result.stdout}`,
     );
   }
 }
