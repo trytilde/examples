@@ -212,7 +212,6 @@ found.
 - [Tilde Harness SDK](https://github.com/trytilde/harness-sdk): ChatKit, MCP,
   reverse-proxy, and typed provider-context integration.
 - [`tilde-state.yaml`](./tilde-state.yaml): portable Tilde resources.
-- [`post.md`](./post.md): draft article explaining the design.
 
 ## Limitations
 
