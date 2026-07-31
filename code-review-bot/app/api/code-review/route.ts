@@ -25,7 +25,6 @@ export const POST = chatKitEndpoint({
   client: tilde,
   webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
   async handler(request, context) {
-    const startedAt = Date.now();
     const signal = AbortSignal.any([
       request.signal,
       AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -39,48 +38,31 @@ export const POST = chatKitEndpoint({
       client: tilde,
       serverId: env.TILDE_MCP_SERVER_ID,
     });
-    console.info("code_review_mcp_connected", {
-      durationMs: Date.now() - startedAt,
-      sessionId: context.sessionId,
-    });
+    console.info("Connected to the Tilde MCP server.");
     let sandbox: CodeReviewSandbox | undefined;
-    let closePromise: Promise<void> | undefined;
-    const close = () => {
-      closePromise ??= (async () => {
-        const results = await Promise.allSettled([
-          sandbox?.close(),
-          closeMcp(),
-        ]);
-        for (const result of results) {
-          if (result.status === "rejected") {
-            console.error("code_review_cleanup_failed", {
-              error: result.reason,
-              sessionId: context.sessionId,
-            });
-          }
+
+    async function closeResources() {
+      const results = await Promise.allSettled([sandbox?.close(), closeMcp()]);
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.error(
+            "Could not clean up a code review resource.",
+            result.reason,
+          );
         }
-      })();
-      return closePromise;
-    };
+      }
+    }
 
     try {
       const remoteTools = await mcp.tools();
-      console.info("code_review_mcp_tools_loaded", {
-        durationMs: Date.now() - startedAt,
-        sessionId: context.sessionId,
-        toolCount: Object.keys(remoteTools).length,
-      });
+      console.info(`Loaded ${Object.keys(remoteTools).length} MCP tools.`);
       const activeSandbox = await createCodeReviewSandbox(
         env,
         tilde,
         signal,
       );
       sandbox = activeSandbox;
-      console.info("code_review_sandbox_ready", {
-        durationMs: Date.now() - startedAt,
-        sandboxId: activeSandbox.id,
-        sessionId: context.sessionId,
-      });
+      console.info(`Created Modal sandbox ${activeSandbox.id}.`);
       const tools = {
         ...Object.fromEntries(
           Object.entries(remoteTools).filter(
@@ -97,38 +79,24 @@ export const POST = chatKitEndpoint({
         system: codeReviewPrompt(activeSandbox.id, context.github),
         tools,
         async onError({ error }) {
-          console.error("code_review_failed", {
-            error,
-            sandboxId: activeSandbox.id,
-            sessionId: context.sessionId,
-          });
-          await close();
+          console.error("The code review failed.", error);
+          await closeResources();
         },
         async onAbort() {
-          console.warn("code_review_aborted", {
-            durationMs: Date.now() - startedAt,
-            sandboxId: activeSandbox.id,
-            sessionId: context.sessionId,
-          });
-          await close();
+          console.warn("The code review was cancelled.");
+          await closeResources();
         },
         onStepFinish({ stepNumber, toolCalls }) {
-          console.info("code_review_step", {
-            sessionId: context.sessionId,
-            stepNumber,
-            tools: toolCalls.map(({ toolName }) => toolName),
-          });
+          const names = toolCalls.map(({ toolName }) => toolName).join(", ");
+          console.info(
+            names
+              ? `Finished step ${stepNumber} using ${names}.`
+              : `Finished step ${stepNumber}.`,
+          );
         },
-        async onFinish({ finishReason, steps, text }) {
-          console.info("code_review_completed", {
-            durationMs: Date.now() - startedAt,
-            finishReason,
-            responseLength: text.length,
-            sandboxId: activeSandbox.id,
-            sessionId: context.sessionId,
-            stepCount: steps.length,
-          });
-          await close();
+        async onFinish({ steps }) {
+          console.info(`Completed the code review in ${steps.length} steps.`);
+          await closeResources();
         },
       });
 
@@ -137,7 +105,7 @@ export const POST = chatKitEndpoint({
         originalMessages: messages,
       });
     } catch (error) {
-      await close();
+      await closeResources();
       throw error;
     }
   },

@@ -112,10 +112,10 @@ export async function createCodeReviewSandbox(
       closed = true;
       abortSignal.removeEventListener("abort", abort);
       await sandbox.terminate().catch((error) => {
-        console.error("sandbox_termination_failed", {
+        console.error(
+          `Could not stop Modal sandbox ${sandbox.sandboxId}.`,
           error,
-          sandboxId: sandbox.sandboxId,
-        });
+        );
       });
       modal.close();
     },
