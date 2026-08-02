@@ -22,8 +22,8 @@ importers:
         specifier: 0.1.2
         version: 0.1.2
       '@trytilde/harness-sdk-vercel-ai-node':
-        specifier: git+https://github.com/trytilde/harness-sdk.git#b658d48e9f4760899d26e7fa473dc13e4a3ce3cb&path:packages/vercel-ai-node
-        version: git+https://git@github.com:trytilde/harness-sdk.git#b658d48e9f4760899d26e7fa473dc13e4a3ce3cb&path:packages/vercel-ai-node(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))
+        specifier: file:../vendor/trytilde-harness-sdk-vercel-ai-node-0.2.0-sentry-signals.0.tgz
+        version: file:../vendor/trytilde-harness-sdk-vercel-ai-node-0.2.0-sentry-signals.0.tgz(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))
       ai:
         specifier: 6.0.220
         version: 6.0.220(zod@4.4.3)
@@ -540,9 +540,9 @@ packages:
   '@trytilde/api-client@0.1.2':
     resolution: {integrity: sha512-kpwS1CgRqVrTrcYJ5ZrZm+iA1gamx5CO9YRzTT9rEdn5bIOTsrbHyTCvbBTH9XrBD3Q5K3dFenW0H2Ku7NMScA==}
 
-  '@trytilde/harness-sdk-vercel-ai-node@git+https://git@github.com:trytilde/harness-sdk.git#b658d48e9f4760899d26e7fa473dc13e4a3ce3cb&path:packages/vercel-ai-node':
-    resolution: {commit: b658d48e9f4760899d26e7fa473dc13e4a3ce3cb, path: packages/vercel-ai-node, repo: git@github.com:trytilde/harness-sdk.git, type: git}
-    version: 0.1.2
+  '@trytilde/harness-sdk-vercel-ai-node@file:../vendor/trytilde-harness-sdk-vercel-ai-node-0.2.0-sentry-signals.0.tgz':
+    resolution: {integrity: sha512-zuSSJAqUVMzVgbFUT4tHYBGItDRcA9/OLc0rpH6Z4YzCuNstFb1Q3qB7JUiB/eo8Tt2Qsc7tpeDGPINRXmRq2A==, tarball: file:../vendor/trytilde-harness-sdk-vercel-ai-node-0.2.0-sentry-signals.0.tgz}
+    version: 0.2.0-sentry-signals.0
     peerDependencies:
       '@ai-sdk/mcp': ^1.0.46
       '@trytilde/harness-sdk': ^0.1.2
@@ -2442,7 +2442,7 @@ snapshots:
 
   '@trytilde/api-client@0.1.2': {}
 
-  '@trytilde/harness-sdk-vercel-ai-node@git+https://git@github.com:trytilde/harness-sdk.git#b658d48e9f4760899d26e7fa473dc13e4a3ce3cb&path:packages/vercel-ai-node(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))':
+  '@trytilde/harness-sdk-vercel-ai-node@file:../vendor/trytilde-harness-sdk-vercel-ai-node-0.2.0-sentry-signals.0.tgz(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))':
     dependencies:
       '@ai-sdk/mcp': 1.0.59(zod@4.4.3)
       '@trytilde/harness-sdk': 0.1.2

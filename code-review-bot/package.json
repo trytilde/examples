@@ -14,7 +14,6 @@
       "sharp": "0.35.3"
     },
     "onlyBuiltDependencies": [
-      "@trytilde/harness-sdk-vercel-ai-node",
       "cbor-extract",
       "esbuild",
       "protobufjs",
@@ -33,7 +32,7 @@
     "@ai-sdk/mcp": "1.0.59",
     "@ai-sdk/openai": "3.0.81",
     "@trytilde/harness-sdk": "0.1.2",
-    "@trytilde/harness-sdk-vercel-ai-node": "git+https://github.com/trytilde/harness-sdk.git#b658d48e9f4760899d26e7fa473dc13e4a3ce3cb&path:packages/vercel-ai-node",
+    "@trytilde/harness-sdk-vercel-ai-node": "file:../vendor/trytilde-harness-sdk-vercel-ai-node-0.2.0-sentry-signals.0.tgz",
     "ai": "6.0.220",
     "modal": "0.9.0",
     "next": "16.2.12",
