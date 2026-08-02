@@ -12,7 +12,7 @@
   },
   "scripts": { "dev": "next dev --webpack", "build": "next build --webpack", "start": "next start", "lint": "eslint .", "typecheck": "tsc --noEmit" },
   "dependencies": {
-    "@ai-sdk/mcp": "1.0.59", "@ai-sdk/openai": "3.0.81", "@trytilde/harness-sdk": "0.1.2", "@trytilde/harness-sdk-vercel-ai-node": "0.1.2", "ai": "6.0.220", "modal": "0.9.0", "next": "16.2.12", "react": "19.2.8", "react-dom": "19.2.8", "string-argv": "0.3.2", "zod": "4.4.3"
+    "@ai-sdk/mcp": "1.0.59", "@ai-sdk/openai": "3.0.81", "@trytilde/harness-sdk": "0.1.2", "@trytilde/harness-sdk-vercel-ai-node": "0.1.2", "ai": "6.0.220", "next": "16.2.12", "react": "19.2.8", "react-dom": "19.2.8", "zod": "4.4.3"
   },
   "devDependencies": { "@types/node": "24.10.0", "@types/react": "19.2.7", "@types/react-dom": "19.2.3", "eslint": "9.39.1", "eslint-config-next": "16.2.12", "typescript": "5.9.3" }
 }

@@ -116,6 +116,8 @@ resources:
     displayName: Sentry Remediation
     isDynamicToolDiscovery: false
     functions:
+      - { configuredParams: {}, enabled: true, toolDescription: Create a bounded Modal remediation sandbox., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_create_sandbox, toolSourceTypeId: modal_create_sandbox }
+      - { configuredParams: {}, enabled: true, toolDescription: Terminate the remediation sandbox after use., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_terminate_sandbox, toolSourceTypeId: modal_terminate_sandbox }
       - { configuredParams: {}, enabled: true, toolDescription: Inspect the request-scoped remediation sandbox., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_get_sandbox, toolSourceTypeId: modal_get_sandbox }
       - { configuredParams: {}, enabled: true, toolDescription: Read a repository file in Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_read_file, toolSourceTypeId: modal_read_file }
       - { configuredParams: {}, enabled: true, toolDescription: List a repository directory in Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_list_dir, toolSourceTypeId: modal_list_dir }
