@@ -29,24 +29,15 @@ export const POST = chatKitEndpoint({
   requestTimeoutMs: REQUEST_TIMEOUT_MS,
   async handler(request, context) {
     const history = await context.session.history();
-    let handledSentrySignal = false;
     const messages = await convertToAiSdkMessages({
       messages: [...history.items, ...context.messages],
       chatkit: context.chatkit,
       onUnprocessed: {
         sentry: {
-          "sentry.issue.created": (signal) => {
-            handledSentrySignal = true;
-            return sentryIssueCreatedMessage(signal);
-          },
+          "sentry.issue.created": sentryIssueCreatedMessage,
         },
       },
     });
-    if (!handledSentrySignal) {
-      throw new Error(
-        "The remediation session does not contain a valid Sentry issue-created signal",
-      );
-    }
     const { mcp, closeMcp } = await createMCPClient({
       client: tilde,
       serverId: env.TILDE_MCP_SERVER_ID,
