@@ -10,7 +10,7 @@
     "overrides": { "postcss": "8.5.25", "sharp": "0.35.3" },
     "onlyBuiltDependencies": ["cbor-extract", "esbuild", "protobufjs", "sharp", "unrs-resolver"]
   },
-  "scripts": { "dev": "next dev --webpack", "build": "next build --webpack", "start": "next start", "lint": "eslint .", "typecheck": "tsc --noEmit" },
+  "scripts": { "dev": "next dev --webpack", "build": "next build --webpack", "start": "next start", "lint": "eslint .", "typecheck": "tsc --noEmit", "test": "node --test lib/remediation/issue-session-key.test.mjs" },
   "dependencies": {
     "@ai-sdk/mcp": "1.0.59", "@ai-sdk/openai": "3.0.81", "@trytilde/harness-sdk": "0.1.2", "@trytilde/harness-sdk-vercel-ai-node": "0.1.2", "ai": "6.0.220", "next": "16.2.12", "react": "19.2.8", "react-dom": "19.2.8", "zod": "4.4.3"
   },
