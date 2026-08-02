@@ -19,13 +19,8 @@ export const POST = chatKitEndpoint({
   webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
   async handler(request, context) {
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
-    const history = await context.session.history();
-    const messages = await convertToAiSdkMessages({ messages: [...history.items, ...context.messages], chatkit: context.chatkit });
-    const rawMessages = await tilde.chatkit.listMessageHistory({
-      sessionId: context.sessionId,
-      pageSize: 100,
-    });
-    const signalPrompt = latestSentrySignalPrompt(rawMessages.items);
+    const messages = await convertToAiSdkMessages({ messages: context.messages, chatkit: context.chatkit });
+    const signalPrompt = await waitForSentrySignalPrompt(context.sessionId, signal);
     const { mcp, closeMcp } = await createMCPClient({ client: tilde, serverId: env.TILDE_MCP_SERVER_ID });
     let sandbox: RemediationSandbox | undefined;
     async function closeResources() { for (const result of await Promise.allSettled([sandbox?.close(), closeMcp()])) if (result.status === "rejected") console.error("Could not clean up remediation resource.", result.reason); }
@@ -52,3 +47,33 @@ export const POST = chatKitEndpoint({
     } catch (error) { await closeResources(); throw error; }
   },
 });
+
+async function waitForSentrySignalPrompt(sessionId: string, signal: AbortSignal): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const rawMessages = await tilde.chatkit.listMessageHistory({ sessionId, pageSize: 100 });
+      return latestSentrySignalPrompt(rawMessages.items);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 19) break;
+      await abortableDelay(250, signal);
+    }
+  }
+  throw lastError;
+}
+
+function abortableDelay(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(signal.reason);
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
