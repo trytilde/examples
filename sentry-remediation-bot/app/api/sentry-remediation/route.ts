@@ -21,7 +21,10 @@ export const POST = chatKitEndpoint({
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
     const history = await context.session.history();
     const messages = await convertToAiSdkMessages({ messages: [...history.items, ...context.messages], chatkit: context.chatkit });
-    const rawMessages = await tilde.messages.list({ sessionId: context.sessionId, pageSize: 100 });
+    const rawMessages = await tilde.chatkit.listMessageHistory({
+      sessionId: context.sessionId,
+      pageSize: 100,
+    });
     const signalPrompt = latestSentrySignalPrompt(rawMessages.items);
     const { mcp, closeMcp } = await createMCPClient({ client: tilde, serverId: env.TILDE_MCP_SERVER_ID });
     let sandbox: RemediationSandbox | undefined;

@@ -35,6 +35,17 @@ resources:
     toolGroupSourceTypeId: github
     userCredentialId: null
 
+  reverse_proxy/profile/github-git-https:
+    refs: { resource_server_credential: credential/setup_item/github }
+    providerId: github_git_https
+    baseUrl: https://github.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: GitHub Git HTTPS
+    ownerId: null
+    resourceServerCredentialId: null
+    userCredentialId: null
+
   credential/setup_item/modal-sandbox:
     credentialSourceTypeId: modal_custom_json_schema
     desiredEnabled: true
