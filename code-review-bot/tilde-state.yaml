@@ -12,8 +12,13 @@ resources:
     displayName: Code Review
     enabled: true
     endpointUrl: https://YOUR_DEPLOYMENT.example/api/code-review
+  chatkit/provider/trytilde:
+    desiredEnabled: true
+    displayName: GitHub
+    providerConfiguration: {}
+    providerId: chatkit.channel.github
   credential/setup_item/github:
-    credentialSourceTypeId: server_token_exchange
+    credentialSourceTypeId: api_key
     desiredEnabled: true
     displayName: GitHub
     metadata:
@@ -31,7 +36,7 @@ resources:
   mcp/tool_provider/github:
     refs:
       resource_server_credential: credential/setup_item/github
-    credentialSourceTypeId: server_token_exchange
+    credentialSourceTypeId: api_key
     displayName: GitHub
     resourceServerCredentialId: null
     status: brokering_initiated
@@ -61,6 +66,39 @@ resources:
     resourceServerCredentialId: null
     status: brokering_initiated
     toolGroupSourceTypeId: modal_sandbox
+    userCredentialId: null
+  reverse_proxy/profile/github-rest:
+    refs:
+      resource_server_credential: credential/setup_item/github
+    baseUrl: https://api.github.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: GitHub REST
+    ownerId: null
+    providerId: github
+    resourceServerCredentialId: null
+    userCredentialId: null
+  reverse_proxy/profile/github-git-https:
+    refs:
+      resource_server_credential: credential/setup_item/github
+    baseUrl: https://github.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: GitHub Git HTTPS
+    ownerId: null
+    providerId: github_git_https
+    resourceServerCredentialId: null
+    userCredentialId: null
+  reverse_proxy/profile/modal-sandbox-api:
+    refs:
+      resource_server_credential: credential/setup_item/modal-sandbox
+    baseUrl: https://api.modal.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: Modal
+    ownerId: null
+    providerId: modal_sandbox
+    resourceServerCredentialId: null
     userCredentialId: null
   mcp/server/code-review:
     refs:

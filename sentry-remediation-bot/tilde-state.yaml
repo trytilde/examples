@@ -14,7 +14,7 @@ resources:
     endpointUrl: https://YOUR_DEPLOYMENT.example/api/sentry-remediation
 
   credential/setup_item/github:
-    credentialSourceTypeId: server_token_exchange
+    credentialSourceTypeId: api_key
     desiredEnabled: true
     displayName: GitHub
     metadata:
@@ -28,7 +28,7 @@ resources:
     status: pending
   mcp/tool_provider/github:
     refs: { resource_server_credential: credential/setup_item/github }
-    credentialSourceTypeId: server_token_exchange
+    credentialSourceTypeId: api_key
     displayName: GitHub
     resourceServerCredentialId: null
     status: brokering_initiated
@@ -42,6 +42,17 @@ resources:
     customHeaders: {}
     desiredEnabled: true
     displayName: GitHub Git HTTPS
+    ownerId: null
+    resourceServerCredentialId: null
+    userCredentialId: null
+
+  reverse_proxy/profile/github-rest:
+    refs: { resource_server_credential: credential/setup_item/github }
+    providerId: github
+    baseUrl: https://api.github.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: GitHub REST
     ownerId: null
     resourceServerCredentialId: null
     userCredentialId: null
@@ -68,6 +79,17 @@ resources:
     toolGroupSourceTypeId: modal_sandbox
     userCredentialId: null
 
+  reverse_proxy/profile/modal-sandbox-api:
+    refs: { resource_server_credential: credential/setup_item/modal-sandbox }
+    providerId: modal_sandbox
+    baseUrl: https://api.modal.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: Modal
+    ownerId: null
+    resourceServerCredentialId: null
+    userCredentialId: null
+
   credential/setup_item/sentry:
     credentialSourceTypeId: api_key
     desiredEnabled: true
@@ -91,8 +113,27 @@ resources:
     toolGroupSourceTypeId: sentry
     userCredentialId: null
 
+  reverse_proxy/profile/sentry-rest:
+    refs: { resource_server_credential: credential/setup_item/sentry }
+    providerId: sentry
+    baseUrl: https://sentry.io/api/0
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: Sentry REST
+    ownerId: null
+    resourceServerCredentialId: null
+    userCredentialId: null
+
+  mcp/tool_provider/tilde-human-approval:
+    credentialSourceTypeId: no_auth
+    displayName: Tilde Human Approval
+    resourceServerCredentialId: null
+    status: active
+    toolGroupSourceTypeId: tilde_human_approval
+    userCredentialId: null
+
   signals/provider_instance/spi_6a4815cc-449d-4a10-bf1c-a30717442071:
-    providerType: sentry
+    signalProviderSourceTypeId: sentry
     credentialSourceTypeId: no_auth
     displayName: Sentry Issues
     desiredEnabled: true
@@ -124,6 +165,7 @@ resources:
       tool_provider_github: mcp/tool_provider/github
       tool_provider_modal_sandbox: mcp/tool_provider/modal-sandbox
       tool_provider_sentry: mcp/tool_provider/sentry
+      tool_provider_tilde_human_approval: mcp/tool_provider/tilde-human-approval
     displayName: Sentry Remediation
     isDynamicToolDiscovery: false
     functions:
@@ -145,6 +187,7 @@ resources:
       - { configuredParams: {}, enabled: true, toolDescription: Read a full Sentry event and stacktrace., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_get_event_stacktrace, toolSourceTypeId: sentry_get_event_stacktrace }
       - { configuredParams: {}, enabled: true, toolDescription: Assign or update a Sentry issue., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_update_issue, toolSourceTypeId: sentry_update_issue }
       - { configuredParams: {}, enabled: true, toolDescription: Add a visible note to a Sentry issue., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_add_issue_note, toolSourceTypeId: sentry_add_issue_note }
+      - { configuredParams: {}, enabled: true, toolDescription: Wait for human assistance when remediation needs approval or credentials., toolGroupInstanceId: tilde-human-approval, toolGroupSourceTypeId: tilde_human_approval, toolName: wait_for_human_assistance_to_complete, toolSourceTypeId: wait_for_human_assistance_to_complete }
       - { configuredParams: {}, enabled: true, toolDescription: Search GitHub issues and pull requests for related work., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_search_issues, toolSourceTypeId: github_search_issues }
       - { configuredParams: {}, enabled: true, toolDescription: Read a matching GitHub issue or pull request., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_get_issue, toolSourceTypeId: github_get_issue }
       - { configuredParams: {}, enabled: true, toolDescription: List open pull requests to avoid duplicates., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_list_pull_requests, toolSourceTypeId: github_list_pull_requests }
