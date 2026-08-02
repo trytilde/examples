@@ -16,15 +16,13 @@ export function sentryIssueCreatedMessage(
     typeof event.eventID === "string"
       ? event.eventID
       : "not provided";
-  const prompt = [
-    "A new Sentry issue signal triggered this remediation run.",
-    `Summary: ${signal.summary ?? issue.title}`,
-    `Issue: ${issue.shortId ?? issue.id} (${issue.id})`,
-    `URL: ${issue.permalink ?? "not provided"}`,
-    `Event ID: ${eventId}`,
-    `Title: ${issue.title}`,
-    "Investigate this exact issue and complete the remediation workflow described in the system prompt.",
-  ].join("\n");
+  const prompt = `A new Sentry issue signal triggered this remediation run.
+Summary: ${signal.summary ?? issue.title}
+Issue: ${issue.shortId ?? issue.id} (${issue.id})
+URL: ${issue.permalink ?? "not provided"}
+Event ID: ${eventId}
+Title: ${issue.title}
+Investigate this exact issue and complete the remediation workflow described in the system prompt.`;
 
   return {
     id: signal.id,
