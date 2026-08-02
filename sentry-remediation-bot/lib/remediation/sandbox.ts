@@ -1,68 +1,195 @@
-import { createTildeGrpcReverseProxy, reverseProxyPath, type Client } from "@trytilde/harness-sdk";
-import { ModalClient, type Sandbox, type SandboxExecParams } from "modal";
-import { parseArgsStringToArgv } from "string-argv";
+import { reverseProxyPath, type Client } from "@trytilde/harness-sdk";
+import type { ToolSet } from "ai";
 import type { Env } from "@/lib/env";
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
-const MAX_COMMAND_TIMEOUT_MS = 120 * 1000;
-export type RemediationSandbox = { close(): Promise<void>; id: string; repositoryPath: string };
+const BOOTSTRAP_TIMEOUT_MS = 180 * 1000;
 
-export async function createRemediationSandbox(env: Env, client: Client): Promise<RemediationSandbox> {
+type ToolExecutionOptions = {
+  abortSignal: AbortSignal;
+  messages: [];
+  toolCallId: string;
+};
+type ExecutableTool = {
+  execute?: (input: Record<string, unknown>, options: ToolExecutionOptions) => Promise<unknown>;
+};
+type ModalResult = {
+  content?: Array<{ text?: string; type?: string }>;
+  isError?: boolean;
+  structuredContent?: unknown;
+};
+type ModalExecResult = {
+  exit_code: number;
+  stderr: string;
+  stdout: string;
+  timed_out: boolean;
+};
+
+export type RemediationSandbox = {
+  close(): Promise<void>;
+  id: string;
+  repositoryPath: string;
+};
+
+/** Create a Modal sandbox through Tilde's server-side MCP provider and clone the target repository. */
+export async function createRemediationSandbox(
+  env: Env,
+  client: Client,
+  tools: ToolSet,
+  abortSignal: AbortSignal,
+): Promise<RemediationSandbox> {
   const [owner, repo] = env.GITHUB_REPOSITORY.split("/");
-  const gitProxyUrl = new URL(reverseProxyPath({ profileId: env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID, teamId: client.config.teamId }), client.config.baseUrl).toString().replace(/\/$/, "");
-  const modalProxy = createTildeGrpcReverseProxy({ client, profileId: env.TILDE_MODAL_PROXY_PROFILE_ID });
-  const modal = createModalClient(modalProxy);
-  let sandbox: Sandbox | undefined;
+  const gitProxyUrl = new URL(
+    reverseProxyPath({
+      profileId: env.TILDE_GITHUB_GIT_PROXY_PROFILE_ID,
+      teamId: client.config.teamId,
+    }),
+    client.config.baseUrl,
+  )
+    .toString()
+    .replace(/\/$/, "");
+  const createTool = requireTool(tools, "modal_create_sandbox");
+  const execTool = requireTool(tools, "modal_exec_command");
+  const terminateTool = requireTool(tools, "modal_terminate_sandbox");
+  const options: ToolExecutionOptions = {
+    abortSignal,
+    messages: [],
+    toolCallId: `sentry-remediation-bootstrap-${crypto.randomUUID()}`,
+  };
+
+  let sandboxId: string | undefined;
   let closed = false;
-  async function close() { if (closed) return; closed = true; await sandbox?.terminate().catch((error) => console.error("Could not stop Modal sandbox.", error)); modal.close(); }
+  async function close() {
+    if (closed || !sandboxId) return;
+    closed = true;
+    const cleanupOptions = {
+      ...options,
+      abortSignal: AbortSignal.timeout(30_000),
+      toolCallId: `sentry-remediation-cleanup-${crypto.randomUUID()}`,
+    };
+    await invokeTool(terminateTool, { sandbox_id: sandboxId }, cleanupOptions).catch((error) =>
+      console.error("Could not stop Modal sandbox.", error),
+    );
+  }
+
   try {
-    const app = await modal.apps.fromName(env.TILDE_MODAL_APP_NAME, { createIfMissing: true });
-    const image = modal.images.fromRegistry("node:22-bookworm").dockerfileCommands([
-      "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl git gh jq ripgrep && rm -rf /var/lib/apt/lists/*",
-      "RUN npm install --global pnpm@10",
-    ]);
-    sandbox = await modal.sandboxes.create(app, image, {
-      cpu: 4,
-      cpuLimit: 4,
-      idleTimeoutMs: FIVE_MINUTES_MS,
-      memoryMiB: 4096,
-      memoryLimitMiB: 4096,
-      outboundDomainAllowlist: [
-        new URL(client.config.baseUrl).hostname,
-        "registry.npmjs.org",
-        "index.crates.io",
-        "static.crates.io",
-        "pypi.org",
-        "files.pythonhosted.org",
-        "proxy.golang.org",
-        "sum.golang.org",
-        "repo.maven.apache.org",
-      ],
-      tags: { agent: "sentry-remediation" },
-      timeoutMs: THIRTY_MINUTES_MS,
-    });
-    await requireSuccess(sandbox, "mkdir -p /workspace");
-    await requireSuccess(sandbox, `git config --global url.${gitProxyUrl}/.insteadOf https://github.com/`);
-    await requireSuccess(sandbox, `git config --global --add http.${gitProxyUrl}/.extraHeader "x-api-key: ${env.TILDE_API_KEY}"`);
-    await requireSuccess(sandbox, `git config --global --add http.${gitProxyUrl}/.extraHeader "x-tilde-org-id: ${env.TILDE_ORG_ID}"`);
+    const created = await invokeTool(
+      createTool,
+      { app_name: env.TILDE_MODAL_APP_NAME, timeout_ms: THIRTY_MINUTES_MS },
+      options,
+    );
+    sandboxId = requiredString(created, "sandbox_id");
+    await requireSuccess(
+      execTool,
+      sandboxId,
+      "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git jq nodejs npm ripgrep && npm install --global pnpm@10 && rm -rf /var/lib/apt/lists/*",
+      "/",
+      options,
+    );
+    await requireSuccess(execTool, sandboxId, "mkdir -p /workspace", "/", options);
+    await requireSuccess(
+      execTool,
+      sandboxId,
+      `git config --global url.${shellQuote(`${gitProxyUrl}/`)}.insteadOf https://github.com/`,
+      "/",
+      options,
+    );
+    await requireSuccess(
+      execTool,
+      sandboxId,
+      `git config --global --add http.${shellQuote(`${gitProxyUrl}/`)}.extraHeader ${shellQuote(`x-api-key: ${env.TILDE_API_KEY}`)}`,
+      "/",
+      options,
+    );
+    await requireSuccess(
+      execTool,
+      sandboxId,
+      `git config --global --add http.${shellQuote(`${gitProxyUrl}/`)}.extraHeader ${shellQuote(`x-tilde-org-id: ${env.TILDE_ORG_ID}`)}`,
+      "/",
+      options,
+    );
     const repositoryPath = `/workspace/${repo}`;
-    await requireSuccess(sandbox, `git clone https://github.com/${owner}/${repo}.git ${repositoryPath}`);
-    return { close, id: sandbox.sandboxId, repositoryPath };
-  } catch (error) { await close(); throw error; }
+    await requireSuccess(
+      execTool,
+      sandboxId,
+      `git clone ${shellQuote(`https://github.com/${owner}/${repo}.git`)} ${shellQuote(repositoryPath)}`,
+      "/",
+      options,
+    );
+    return { close, id: sandboxId, repositoryPath };
+  } catch (error) {
+    await close();
+    throw error;
+  }
 }
 
-function createModalClient(proxy: ReturnType<typeof createTildeGrpcReverseProxy>): ModalClient {
-  const previous = process.env.MODAL_SERVER_URL; process.env.MODAL_SERVER_URL = proxy.endpoint;
-  try { return new ModalClient({ endpoint: proxy.endpoint, grpcMiddleware: [proxy.middleware], tokenId: "tilde-reverse-proxy", tokenSecret: "tilde-reverse-proxy" }); }
-  finally { if (previous === undefined) delete process.env.MODAL_SERVER_URL; else process.env.MODAL_SERVER_URL = previous; }
+/** Hide lifecycle tools after bootstrap so the model cannot create or terminate unrelated sandboxes. */
+export function agentRemediationTools(tools: ToolSet): ToolSet {
+  return Object.fromEntries(
+    Object.entries(tools).filter(
+      ([name]) => name !== "modal_create_sandbox" && name !== "modal_terminate_sandbox",
+    ),
+  );
 }
-async function requireSuccess(sandbox: Sandbox, command: string) {
-  const result = await runCommand(sandbox, parseArgsStringToArgv(command), { timeoutMs: MAX_COMMAND_TIMEOUT_MS, workdir: "/" });
-  if (result.exitCode !== 0) throw new Error(`Sandbox command failed: ${result.stderr || result.stdout}`);
+
+function requireTool(tools: ToolSet, name: string): ExecutableTool {
+  const tool = tools[name] as ExecutableTool | undefined;
+  if (!tool?.execute) throw new Error(`Required MCP tool is unavailable: ${name}`);
+  return tool;
 }
-async function runCommand(sandbox: Sandbox, command: string[], params: SandboxExecParams = {}) {
-  const process = await sandbox.exec(command, { ...params, mode: "text", stderr: "pipe", stdout: "pipe" });
-  const [exitCode, stdout, stderr] = await Promise.all([process.wait(), process.stdout.readText(), process.stderr.readText()]);
-  return { exitCode, stdout, stderr };
+
+async function invokeTool(
+  tool: ExecutableTool,
+  input: Record<string, unknown>,
+  options: ToolExecutionOptions,
+): Promise<Record<string, unknown>> {
+  if (!tool.execute) throw new Error("MCP tool does not have an executor");
+  const raw = (await tool.execute(input, options)) as ModalResult;
+  if (raw.isError) throw new Error(`Modal MCP tool failed: ${toolText(raw)}`);
+  const value = raw.structuredContent ?? parseToolText(raw);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Modal MCP tool returned an invalid result");
+  }
+  return value as Record<string, unknown>;
+}
+
+async function requireSuccess(
+  tool: ExecutableTool,
+  sandboxId: string,
+  command: string,
+  workdir: string,
+  options: ToolExecutionOptions,
+) {
+  const result = (await invokeTool(
+    tool,
+    {
+      cmd: command,
+      sandbox_id: sandboxId,
+      timeout_ms: BOOTSTRAP_TIMEOUT_MS,
+      workdir,
+    },
+    options,
+  )) as ModalExecResult;
+  if (result.timed_out || result.exit_code !== 0) {
+    throw new Error(`Sandbox command failed: ${result.stderr || result.stdout}`);
+  }
+}
+
+function requiredString(value: Record<string, unknown>, key: string): string {
+  const field = value[key];
+  if (typeof field !== "string" || !field) throw new Error(`Modal MCP result is missing ${key}`);
+  return field;
+}
+
+function parseToolText(result: ModalResult): unknown {
+  const text = toolText(result);
+  return text ? JSON.parse(text) : undefined;
+}
+
+function toolText(result: ModalResult): string {
+  return result.content?.find((part) => part.type === "text")?.text ?? "";
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
