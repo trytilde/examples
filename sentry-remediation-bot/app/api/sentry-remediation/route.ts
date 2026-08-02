@@ -8,6 +8,7 @@ import {
   createRemediationSandbox,
   type RemediationSandbox,
 } from "@/lib/remediation/sandbox";
+import { latestSentrySignalPrompt } from "@/lib/remediation/signal";
 import { tilde } from "@/lib/tilde";
 
 export const maxDuration = 300;
@@ -20,6 +21,8 @@ export const POST = chatKitEndpoint({
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
     const history = await context.session.history();
     const messages = await convertToAiSdkMessages({ messages: [...history.items, ...context.messages], chatkit: context.chatkit });
+    const rawMessages = await tilde.messages.list({ sessionId: context.sessionId, pageSize: 100 });
+    const signalPrompt = latestSentrySignalPrompt(rawMessages.items);
     const { mcp, closeMcp } = await createMCPClient({ client: tilde, serverId: env.TILDE_MCP_SERVER_ID });
     let sandbox: RemediationSandbox | undefined;
     async function closeResources() { for (const result of await Promise.allSettled([sandbox?.close(), closeMcp()])) if (result.status === "rejected") console.error("Could not clean up remediation resource.", result.reason); }
@@ -30,7 +33,10 @@ export const POST = chatKitEndpoint({
       signal.addEventListener("abort", () => void activeSandbox.close(), { once: true });
       const result = streamText({
         abortSignal: signal,
-        messages: await convertToModelMessages(messages),
+        messages: [
+          ...(await convertToModelMessages(messages)),
+          { role: "user", content: signalPrompt },
+        ],
         model: openai(env.OPENAI_MODEL),
         stopWhen: stepCountIs(60),
         system: remediationPrompt(activeSandbox.id, activeSandbox.repositoryPath, env.GITHUB_REPOSITORY),
