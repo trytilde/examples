@@ -1,0 +1,139 @@
+metadata:
+  name: sentry-remediation-bot
+  description: Sentry issue signals routed to a GitHub and Modal remediation agent.
+resources:
+  chatkit/agent/sentry-remediation:
+    configuration:
+      local_running_endpoint: false
+      local_runtime_path: /api/sentry-remediation
+      provider: chatkit.http-vercel-ai-sdk
+      streaming: true
+      timeout_ms: 300000
+    displayName: Sentry Remediation
+    enabled: true
+    endpointUrl: https://YOUR_DEPLOYMENT.example/api/sentry-remediation
+
+  credential/setup_item/github:
+    credentialSourceTypeId: server_token_exchange
+    desiredEnabled: true
+    displayName: GitHub
+    metadata:
+      bindings: [{ desiredEnabled: true, ownerId: github, ownerType: tool_group_instance }]
+      provider_display_name: GitHub
+      provider_icon_key: github
+      source: state_import
+    ownerId: github
+    ownerType: state_import_credential
+    providerId: github
+    status: pending
+  mcp/tool_provider/github:
+    refs: { resource_server_credential: credential/setup_item/github }
+    credentialSourceTypeId: server_token_exchange
+    displayName: GitHub
+    resourceServerCredentialId: null
+    status: brokering_initiated
+    toolGroupSourceTypeId: github
+    userCredentialId: null
+
+  credential/setup_item/modal-sandbox:
+    credentialSourceTypeId: modal_custom_json_schema
+    desiredEnabled: true
+    displayName: Modal
+    metadata:
+      bindings: [{ desiredEnabled: true, ownerId: modal-sandbox, ownerType: tool_group_instance }]
+      provider_display_name: Modal
+      provider_icon_key: modal_sandbox
+      source: state_import
+    ownerId: modal-sandbox
+    ownerType: state_import_credential
+    providerId: modal_sandbox
+    status: pending
+  mcp/tool_provider/modal-sandbox:
+    refs: { resource_server_credential: credential/setup_item/modal-sandbox }
+    credentialSourceTypeId: modal_custom_json_schema
+    displayName: Modal
+    resourceServerCredentialId: null
+    status: brokering_initiated
+    toolGroupSourceTypeId: modal_sandbox
+    userCredentialId: null
+
+  credential/setup_item/sentry:
+    credentialSourceTypeId: api_key
+    desiredEnabled: true
+    displayName: Sentry
+    metadata:
+      bindings: [{ desiredEnabled: true, ownerId: sentry, ownerType: tool_group_instance }]
+      common_provider_id: sentry
+      provider_display_name: Sentry
+      provider_icon_key: sentry
+      source: state_import
+    ownerId: sentry
+    ownerType: state_import_credential
+    providerId: sentry
+    status: pending
+  mcp/tool_provider/sentry:
+    refs: { resource_server_credential: credential/setup_item/sentry }
+    credentialSourceTypeId: api_key
+    displayName: Sentry
+    resourceServerCredentialId: null
+    status: brokering_initiated
+    toolGroupSourceTypeId: sentry
+    userCredentialId: null
+
+  signals/provider_instance/sentry:
+    providerType: sentry
+    credentialSourceTypeId: no_auth
+    displayName: Sentry Issues
+    desiredEnabled: true
+    ingressMode: webhook
+    configuration:
+      provider_webhook_signing_key: REPLACE_WITH_SENTRY_APP_CLIENT_SECRET
+    pollingState: {}
+
+  signals/rule/8df9b49f-5b11-4fa7-9639-4ac916709a13:
+    refs:
+      agent: chatkit/agent/sentry-remediation
+      provider_instance: signals/provider_instance/sentry
+    displayName: Remediate newly created Sentry issues
+    status: enabled
+    signalType: sentry.issue.created
+    filter: { json_equals: [] }
+    sessionPolicy:
+      type: session_key_template
+      namespace: sentry-remediation
+      template: "sentry#{{ data.issue.id }}"
+      create_if_missing: true
+      title_template: "{{ data.issue.shortId }} {{ data.issue.title }}"
+    action:
+      type: invoke_chatkit_agent
+      agent_inbox_id: sentry-remediation
+
+  mcp/server/sentry-remediation:
+    refs:
+      tool_provider_github: mcp/tool_provider/github
+      tool_provider_modal_sandbox: mcp/tool_provider/modal-sandbox
+      tool_provider_sentry: mcp/tool_provider/sentry
+    displayName: Sentry Remediation
+    isDynamicToolDiscovery: false
+    functions:
+      - { configuredParams: {}, enabled: true, toolDescription: Inspect the request-scoped remediation sandbox., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_get_sandbox, toolSourceTypeId: modal_get_sandbox }
+      - { configuredParams: {}, enabled: true, toolDescription: Read a repository file in Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_read_file, toolSourceTypeId: modal_read_file }
+      - { configuredParams: {}, enabled: true, toolDescription: List a repository directory in Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_list_dir, toolSourceTypeId: modal_list_dir }
+      - { configuredParams: {}, enabled: true, toolDescription: Inspect a repository path in Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_stat, toolSourceTypeId: modal_stat }
+      - { configuredParams: {}, enabled: true, toolDescription: Run a bounded repository command in Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_exec_command, toolSourceTypeId: modal_exec_command }
+      - { configuredParams: {}, enabled: true, toolDescription: Apply a source patch inside Modal., toolGroupInstanceId: modal-sandbox, toolGroupSourceTypeId: modal_sandbox, toolName: modal_apply_patch, toolSourceTypeId: modal_apply_patch }
+      - { configuredParams: {}, enabled: true, toolDescription: Identify the authenticated Sentry user., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_whoami, toolSourceTypeId: sentry_whoami }
+      - { configuredParams: {}, enabled: true, toolDescription: Find accessible Sentry organizations., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_find_organizations, toolSourceTypeId: sentry_find_organizations }
+      - { configuredParams: {}, enabled: true, toolDescription: Find Sentry projects., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_find_projects, toolSourceTypeId: sentry_find_projects }
+      - { configuredParams: {}, enabled: true, toolDescription: Search and deduplicate Sentry issues., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_search_issues, toolSourceTypeId: sentry_search_issues }
+      - { configuredParams: {}, enabled: true, toolDescription: Read complete Sentry issue details., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_get_issue_details, toolSourceTypeId: sentry_get_issue_details }
+      - { configuredParams: {}, enabled: true, toolDescription: Read Sentry issue activity and notes., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_get_issue_activity, toolSourceTypeId: sentry_get_issue_activity }
+      - { configuredParams: {}, enabled: true, toolDescription: Search events grouped into a Sentry issue., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_search_issue_events, toolSourceTypeId: sentry_search_issue_events }
+      - { configuredParams: {}, enabled: true, toolDescription: Read a full Sentry event and stacktrace., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_get_event_stacktrace, toolSourceTypeId: sentry_get_event_stacktrace }
+      - { configuredParams: {}, enabled: true, toolDescription: Assign or update a Sentry issue., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_update_issue, toolSourceTypeId: sentry_update_issue }
+      - { configuredParams: {}, enabled: true, toolDescription: Add a visible note to a Sentry issue., toolGroupInstanceId: sentry, toolGroupSourceTypeId: sentry, toolName: sentry_add_issue_note, toolSourceTypeId: sentry_add_issue_note }
+      - { configuredParams: {}, enabled: true, toolDescription: Search GitHub issues and pull requests for related work., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_search_issues, toolSourceTypeId: github_search_issues }
+      - { configuredParams: {}, enabled: true, toolDescription: Read a matching GitHub issue or pull request., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_get_issue, toolSourceTypeId: github_get_issue }
+      - { configuredParams: {}, enabled: true, toolDescription: List open pull requests to avoid duplicates., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_list_pull_requests, toolSourceTypeId: github_list_pull_requests }
+      - { configuredParams: {}, enabled: true, toolDescription: Open the remediation pull request., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_create_pull_request, toolSourceTypeId: github_create_pull_request }
+      - { configuredParams: {}, enabled: true, toolDescription: Verify the opened pull request., toolGroupInstanceId: github, toolGroupSourceTypeId: github, toolName: github_get_pull_request, toolSourceTypeId: github_get_pull_request }
