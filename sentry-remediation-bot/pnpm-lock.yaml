@@ -22,8 +22,8 @@ importers:
         specifier: 0.1.2
         version: 0.1.2
       '@trytilde/harness-sdk-vercel-ai-node':
-        specifier: 0.1.2
-        version: 0.1.2(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))
+        specifier: 0.2.0
+        version: 0.2.0(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))
       ai:
         specifier: 6.0.220
         version: 6.0.220(zod@4.4.3)
@@ -540,8 +540,8 @@ packages:
   '@trytilde/api-client@0.1.2':
     resolution: {integrity: sha512-kpwS1CgRqVrTrcYJ5ZrZm+iA1gamx5CO9YRzTT9rEdn5bIOTsrbHyTCvbBTH9XrBD3Q5K3dFenW0H2Ku7NMScA==}
 
-  '@trytilde/harness-sdk-vercel-ai-node@0.1.2':
-    resolution: {integrity: sha512-gk/1KH6Rb6kPUpUhtvkJqB5rHz5eBu6WDewcs0FbWJIZZ2A+uf0kr11p0WqklVgbrjn7tJjNZN6Un/Gg01lC2w==}
+  '@trytilde/harness-sdk-vercel-ai-node@0.2.0':
+    resolution: {integrity: sha512-JTCVeI9ZtRzM25VU+/Zyg4dQSp1aUUwqaKuRnw0QJC3DuZ52r9c7Lkw6lkkj50/ksSeaUWCkRyL2xqzpkGKwPg==}
     peerDependencies:
       '@ai-sdk/mcp': ^1.0.46
       '@trytilde/harness-sdk': ^0.1.2
@@ -2441,7 +2441,7 @@ snapshots:
 
   '@trytilde/api-client@0.1.2': {}
 
-  '@trytilde/harness-sdk-vercel-ai-node@0.1.2(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))':
+  '@trytilde/harness-sdk-vercel-ai-node@0.2.0(@ai-sdk/mcp@1.0.59(zod@4.4.3))(@trytilde/harness-sdk@0.1.2)(ai@6.0.220(zod@4.4.3))':
     dependencies:
       '@ai-sdk/mcp': 1.0.59(zod@4.4.3)
       '@trytilde/harness-sdk': 0.1.2

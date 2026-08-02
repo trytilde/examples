@@ -24,6 +24,7 @@ const REQUEST_TIMEOUT_MS = 285_000;
 export const POST = chatKitEndpoint({
   client: tilde,
   webhookSigningKey: env.TILDE_WEBHOOK_SIGNING_KEY,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS,
   async handler(request, context) {
     const github = context.github;
     if (!github) {
@@ -32,10 +33,7 @@ export const POST = chatKitEndpoint({
     if (!github.owner || !github.repo || !github.pull_number) {
       throw new Error("The GitHub message must identify a pull request.");
     }
-    const signal = AbortSignal.any([
-      request.signal,
-      AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    ]);
+    const signal = request.signal;
     const history = await context.session.history();
     const messages = await convertToAiSdkMessages({
       messages: [...history.items, ...context.messages],
