@@ -80,7 +80,7 @@ resources:
     toolGroupSourceTypeId: sentry
     userCredentialId: null
 
-  signals/provider_instance/sentry:
+  signals/provider_instance/6a4815cc-449d-4a10-bf1c-a30717442071:
     providerType: sentry
     credentialSourceTypeId: no_auth
     displayName: Sentry Issues
@@ -93,7 +93,7 @@ resources:
   signals/rule/8df9b49f-5b11-4fa7-9639-4ac916709a13:
     refs:
       agent: chatkit/agent/sentry-remediation
-      provider_instance: signals/provider_instance/sentry
+      provider_instance: signals/provider_instance/6a4815cc-449d-4a10-bf1c-a30717442071
     displayName: Remediate newly created Sentry issues
     status: enabled
     signalType: sentry.issue.created

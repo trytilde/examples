@@ -33,6 +33,11 @@ There is intentionally no `/api/signals` route in this app. Sentry sends its
 webhook to Tilde's durable Signals ingress; the only Vercel endpoint is the
 signed ChatKit agent route at `/api/sentry-remediation`.
 
+The signal provider, rule, and agent use state addresses linked by explicit
+references. A later `tilde state export` preserves `refs.provider_instance` and
+`refs.agent`, remaps those logical addresses on import, and omits the runtime
+webhook endpoint ID and credential secrets.
+
 ## Security boundary
 
 The model never receives long-lived Sentry, GitHub, or Modal credentials.
