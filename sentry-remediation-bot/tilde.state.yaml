@@ -1,17 +1,20 @@
 metadata:
   name: sentry-remediation-bot
   description: Sentry issue signals routed to a GitHub and Modal remediation agent.
+variables:
+  SENTRY_REMEDIATION_ENDPOINT_URL:
+    type: string
+    description: The complete endpoint URL Tilde uses to invoke the Sentry Remediation agent.
 resources:
   chatkit/agent/sentry-remediation:
     configuration:
       local_running_endpoint: false
-      local_runtime_path: /api/sentry-remediation
       provider: chatkit.http-vercel-ai-sdk
       streaming: true
       timeout_ms: 300000
     displayName: Sentry Remediation
     enabled: true
-    endpointUrl: https://YOUR_DEPLOYMENT.example/api/sentry-remediation
+    endpointUrl: ${SENTRY_REMEDIATION_ENDPOINT_URL}
 
   credential/setup_item/github:
     credentialSourceTypeId: api_key

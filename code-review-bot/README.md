@@ -68,17 +68,15 @@ cp .env.example .env.local
 
 ## 2. Import Tilde State
 
-Replace `https://YOUR_DEPLOYMENT.example/api/code-review` in
-[`tilde-state.yaml`](./tilde-state.yaml) with the endpoint you intend to use.
+Set `CODEX_REVIEW_ENDPOINT_URL` when importing
+[`tilde.state.yaml`](./tilde.state.yaml) to the complete endpoint you intend to use.
+
+[![Deploy to Tilde](https://api.trytilde.ai/deploy-button.svg)](https://api.trytilde.ai/deploy?repository-url=https%3A%2F%2Fgithub.com%2Ftrytilde%2Fexamples&state-path=code-review-bot%2Ftilde.state.yaml)
+
 For local development, use the public URL from your Tilde development tunnel.
 
-Import from Mission Control, or with the Tilde CLI:
-
-```bash
-tilde auth login
-tilde auth set-team
-tilde state import tilde-state.yaml .tilde/imports/code-review-output.yaml
-```
+Use the deploy button above, or import the file from Mission Control and provide
+the variable when prompted.
 
 The state creates:
 
@@ -211,7 +209,7 @@ found.
 - [`lib/tilde.ts`](./lib/tilde.ts): the single configured Harness SDK client.
 - [Tilde Harness SDK](https://github.com/trytilde/harness-sdk): ChatKit, MCP,
   reverse-proxy, and typed provider-context integration.
-- [`tilde-state.yaml`](./tilde-state.yaml): portable Tilde resources.
+- [`tilde.state.yaml`](./tilde.state.yaml): portable Tilde resources.
 
 ## Limitations
 

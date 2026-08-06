@@ -1,17 +1,20 @@
 metadata:
   name: code-review-bot
   description: GitHub pull request reviewer with Tilde MCP and a Modal sandbox.
+variables:
+  CODEX_REVIEW_ENDPOINT_URL:
+    type: string
+    description: The complete endpoint URL Tilde uses to invoke the Code Review agent.
 resources:
   chatkit/agent/code-review:
     configuration:
       local_running_endpoint: false
-      local_runtime_path: /api/code-review
       provider: chatkit.http-vercel-ai-sdk
       streaming: true
       timeout_ms: 300000
     displayName: Code Review
     enabled: true
-    endpointUrl: https://YOUR_DEPLOYMENT.example/api/code-review
+    endpointUrl: ${CODEX_REVIEW_ENDPOINT_URL}
   chatkit/provider/trytilde:
     desiredEnabled: true
     displayName: GitHub
