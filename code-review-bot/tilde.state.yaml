@@ -24,7 +24,7 @@ resources:
     providerConfiguration: {}
     providerId: chatkit.channel.github
   credential/setup_item/github:
-    credentialSourceTypeId: api_key
+    credentialSourceTypeId: server_token_exchange
     desiredEnabled: true
     displayName: GitHub
     metadata:
@@ -34,6 +34,7 @@ resources:
           ownerType: tool_group_instance
       provider_display_name: GitHub
       provider_icon_key: github
+      provider_provisioner_id: provider_provisioner.github
       source: state_import
     ownerId: github
     ownerType: state_import_credential
@@ -42,7 +43,7 @@ resources:
   mcp/tool_provider/github:
     refs:
       resource_server_credential: credential/setup_item/github
-    credentialSourceTypeId: api_key
+    credentialSourceTypeId: server_token_exchange
     displayName: GitHub
     resourceServerCredentialId: null
     status: brokering_initiated
