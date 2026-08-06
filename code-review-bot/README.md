@@ -68,7 +68,7 @@ cp .env.example .env.local
 
 ## 2. Import Tilde State
 
-Set `CODEX_REVIEW_ENDPOINT_URL` when importing
+Set `CODEX_REVIEW_CHATKIT_ENDPOINT_URL` when importing
 [`tilde.state.yaml`](./tilde.state.yaml) to the complete endpoint you intend to use.
 
 [![Deploy to Tilde](https://api.trytilde.ai/deploy-button.svg)](https://api.trytilde.ai/deploy?repository-url=https%3A%2F%2Fgithub.com%2Ftrytilde%2Fexamples&state-path=code-review-bot%2Ftilde.state.yaml)

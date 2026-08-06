@@ -18,7 +18,7 @@ Sentry note. It does not resolve the issue before deployment.
 [![Deploy to Tilde](https://api.trytilde.ai/deploy-button.svg)](https://api.trytilde.ai/deploy?repository-url=https%3A%2F%2Fgithub.com%2Ftrytilde%2Fexamples&state-path=sentry-remediation-bot%2Ftilde.state.yaml)
 
 1. Run `pnpm install` and copy `.env.example` to `.env.local`.
-2. Set `SENTRY_REMEDIATION_ENDPOINT_URL` during import and replace
+2. Set `SENTRY_REMEDIATION_CHATKIT_ENDPOINT_URL` during import and replace
    `REPLACE_WITH_SENTRY_APP_CLIENT_SECRET` in `tilde.state.yaml`. Never commit
    the real secret.
 3. Use the deploy button above, or import `tilde.state.yaml` from Mission Control
