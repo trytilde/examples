@@ -16,6 +16,9 @@ resources:
     enabled: true
     endpointUrl: ${CODEX_REVIEW_CHATKIT_ENDPOINT_URL}
   chatkit/provider/trytilde:
+    refs:
+      default_agent: chatkit/agent/code-review
+    defaultAgentInboxId: code-review
     desiredEnabled: true
     displayName: GitHub
     providerConfiguration: {}
