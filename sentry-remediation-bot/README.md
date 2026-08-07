@@ -15,10 +15,14 @@ Sentry note. It does not resolve the issue before deployment.
 
 ## Setup
 
+[![Deploy with Tilde](https://api.trytilde.ai/deploy-button.svg)](https://api.trytilde.ai/deploy?repository-url=https%3A%2F%2Fgithub.com%2Ftrytilde%2Fexamples&state-path=sentry-remediation-bot%2Ftilde.state.yaml)
+
 1. Run `pnpm install` and copy `.env.example` to `.env.local`.
-2. Replace the deployment URL and `REPLACE_WITH_SENTRY_APP_CLIENT_SECRET` in
-   `tilde-state.yaml` before importing it. Never commit the real secret.
-3. Import state with `tilde state import tilde-state.yaml .tilde/imports/sentry-remediation-output.yaml`.
+2. Set `SENTRY_REMEDIATION_CHATKIT_ENDPOINT_URL` during import and replace
+   `REPLACE_WITH_SENTRY_APP_CLIENT_SECRET` in `tilde.state.yaml`. Never commit
+   the real secret.
+3. Use the deploy button above, or import `tilde.state.yaml` from Mission Control
+   and provide the variable when prompted.
 4. Complete the pending Sentry, GitHub, and Modal credentials in Mission Control.
    The Sentry API token needs `org:read`, `project:read`, `event:read`, and
    `event:write`.

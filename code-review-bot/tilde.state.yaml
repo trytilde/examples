@@ -1,17 +1,28 @@
 metadata:
   name: code-review-bot
   description: GitHub pull request reviewer with Tilde MCP and a Modal sandbox.
+variables:
+  CODEX_REVIEW_CHATKIT_ENDPOINT_URL:
+    type: string
+    description: ex. https://acme.com/api/agent. The planned URL to your Tilde agent.
 resources:
   chatkit/agent/code-review:
     configuration:
       local_running_endpoint: false
-      local_runtime_path: /api/code-review
       provider: chatkit.http-vercel-ai-sdk
       streaming: true
       timeout_ms: 300000
     displayName: Code Review
     enabled: true
-    endpointUrl: https://YOUR_DEPLOYMENT.example/api/code-review
+    endpointUrl: ${CODEX_REVIEW_CHATKIT_ENDPOINT_URL}
+  chatkit/provider/trytilde:
+    refs:
+      default_agent: chatkit/agent/code-review
+    defaultAgentInboxId: code-review
+    desiredEnabled: true
+    displayName: GitHub
+    providerConfiguration: {}
+    providerId: chatkit.channel.github
   credential/setup_item/github:
     credentialSourceTypeId: server_token_exchange
     desiredEnabled: true
@@ -23,6 +34,7 @@ resources:
           ownerType: tool_group_instance
       provider_display_name: GitHub
       provider_icon_key: github
+      provider_provisioner_id: provider_provisioner.github
       source: state_import
     ownerId: github
     ownerType: state_import_credential
@@ -61,6 +73,39 @@ resources:
     resourceServerCredentialId: null
     status: brokering_initiated
     toolGroupSourceTypeId: modal_sandbox
+    userCredentialId: null
+  reverse_proxy/profile/github-rest:
+    refs:
+      resource_server_credential: credential/setup_item/github
+    baseUrl: https://api.github.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: GitHub REST
+    ownerId: null
+    providerId: github
+    resourceServerCredentialId: null
+    userCredentialId: null
+  reverse_proxy/profile/github-git-https:
+    refs:
+      resource_server_credential: credential/setup_item/github
+    baseUrl: https://github.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: GitHub Git HTTPS
+    ownerId: null
+    providerId: github_git_https
+    resourceServerCredentialId: null
+    userCredentialId: null
+  reverse_proxy/profile/modal-sandbox-api:
+    refs:
+      resource_server_credential: credential/setup_item/modal-sandbox
+    baseUrl: https://api.modal.com
+    customHeaders: {}
+    desiredEnabled: true
+    displayName: Modal
+    ownerId: null
+    providerId: modal_sandbox
+    resourceServerCredentialId: null
     userCredentialId: null
   mcp/server/code-review:
     refs:
