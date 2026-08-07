@@ -1,0 +1,25 @@
+metadata:
+  name: hello-world-agent
+  description: Minimal ChatKit agent with a Vercel UI channel.
+variables:
+  HELLO_WORLD_CHATKIT_ENDPOINT_URL:
+    type: string
+    description: ex. https://your-agent.vercel.app/api/hello-world
+resources:
+  chatkit/agent/hello-world:
+    configuration:
+      local_running_endpoint: false
+      provider: chatkit.http-vercel-ai-sdk
+      streaming: true
+      timeout_ms: 60000
+    displayName: Hello World
+    enabled: true
+    endpointUrl: ${HELLO_WORLD_CHATKIT_ENDPOINT_URL}
+  chatkit/provider/hello-world-ui:
+    refs:
+      default_agent: chatkit/agent/hello-world
+    defaultAgentInboxId: hello-world
+    desiredEnabled: true
+    displayName: Hello World UI
+    providerConfiguration: {}
+    providerId: chatkit.channel.vercel-ui
